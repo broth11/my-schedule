@@ -128,9 +128,29 @@
     return `${fm} ${first.getDate()} – ${lm} ${last.getDate()}, ${year}`;
   }
 
+  // ── Overlay rendering helpers ─────────────────────────────────────────────
+
+  // Compact overlay block for monthly cells: show first title, "+N more" if many.
+  function _pmoOverlayHTML(evs) {
+    if (!evs || evs.length === 0) return '';
+    const first = evs[0].title;
+    const more  = evs.length > 1 ? ` <span class="pmo-overlay-more">+${evs.length - 1}</span>` : '';
+    return `<div class="pmo-overlay">${first}${more}</div>`;
+  }
+
+  // Full overlay block for weekly daily pages.
+  function _pdwOverlayHTML(evs) {
+    if (!evs || evs.length === 0) return '';
+    const items = evs.map(ev => {
+      const time = ev.startTime ? `<span class="pdw-overlay-time">${ev.startTime}</span> ` : '';
+      return `<div class="pdw-overlay-event">${time}<span class="pdw-overlay-title">${ev.title}</span></div>`;
+    }).join('');
+    return `<div class="pdw-overlay"><span class="pdw-overlay-label">Calendar</span>${items}</div>`;
+  }
+
   // ── Monthly overview HTML builder ──────────────────────────────────────────
 
-  function buildMonthlyPageHTML(monthKey, days, selectedClasses, scheduleAssignments, scheduleCategories, dutyColorMode) {
+  function buildMonthlyPageHTML(monthKey, days, selectedClasses, scheduleAssignments, scheduleCategories, dutyColorMode, overlayEventsByDate) {
     const [year, month] = monthKey.split('-').map(Number);
     const monthName     = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     const daysInMonth   = new Date(year, month, 0).getDate();
@@ -175,13 +195,18 @@
           return;
         }
 
+        const dateKey   = `${year}-${String(month).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
+        const overlayEvs = ((overlayEventsByDate || {})[dateKey] || []);
+        const overlayHTML = _pmoOverlayHTML(overlayEvs);
+
         if (SPECIAL_CYCLES.includes(cycle)) {
           tds += `<td class="pmo-day pmo-special">
             <div class="pmo-top">
               <span class="pmo-dn">${date}</span>
               <span class="pmo-sptag">${cycle}</span>
             </div>
-            ${note ? `<div class="pmo-note">${note}</div>` : ''}
+            ${note     ? `<div class="pmo-note">${note}</div>`  : ''}
+            ${overlayHTML}
           </td>`;
           return;
         }
@@ -198,7 +223,8 @@
             <span class="pmo-dn">${date}</span>
             <span class="pmo-cycle">${cycle}</span>
           </div>
-          ${note ? `<div class="pmo-note">${note}</div>` : ''}
+          ${note     ? `<div class="pmo-note">${note}</div>`  : ''}
+          ${overlayHTML}
           <div class="pmo-chips">${chips}</div>
         </td>`;
       });
@@ -219,7 +245,7 @@
 
   // ── Daily list — week page builder ────────────────────────────────────────
 
-  function buildWeekPageHTML(weekLabel, weekDays, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode) {
+  function buildWeekPageHTML(weekLabel, weekDays, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode, overlayEventsByDate) {
     let daysHTML = '';
 
     weekDays.forEach(({ jsDate, date, data }) => {
@@ -228,6 +254,9 @@
       const cycle      = data?.cycle || null;
       const isSpecial  = cycle && SPECIAL_CYCLES.includes(cycle);
 
+      const pdwDateKey  = `${jsDate.getFullYear()}-${String(jsDate.getMonth()+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
+      const pdwOverlay  = _pdwOverlayHTML(((overlayEventsByDate || {})[pdwDateKey] || []));
+
       daysHTML += `<div class="pdw-day">
         <div class="pdw-day-head">
           <span class="pdw-date">${weekday}, ${monthShort} ${date}</span>
@@ -235,7 +264,8 @@
           ${isSpecial           ? `<span class="pdw-sptag">${cycle}</span>` : ''}
           ${!cycle              ? `<span class="pdw-noschool">No school</span>` : ''}
         </div>
-        ${data?.note ? `<div class="pdw-note">${data.note}</div>` : ''}`;
+        ${data?.note  ? `<div class="pdw-note">${data.note}</div>`  : ''}
+        ${pdwOverlay}`;
 
       if (cycle && !isSpecial) {
         const periods = getPeriodsForDay(cycle);
@@ -320,6 +350,13 @@ body { font-family: Arial, Helvetica, sans-serif; }
   overflow: hidden; display: -webkit-box;
   -webkit-line-clamp: 3; -webkit-box-orient: vertical;
 }
+.pmo-overlay {
+  font-size: 8px; color: #1e40af; font-weight: 500; line-height: 1.3;
+  margin-bottom: 3px;
+  overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.pmo-overlay-more { font-weight: 700; color: #6b7280; }
 .pmo-chips { display: flex; flex-wrap: wrap; gap: 2px; margin-top: auto; padding-top: 3px; }
 .pmo-chip {
   font-size: 8.5px; font-weight: 700; padding: 1px 4px;
@@ -382,6 +419,22 @@ body { font-family: Arial, Helvetica, sans-serif; }
   flex-shrink: 0; white-space: nowrap;
 }
 .pdw-free { color: #c0c0c0; }
+.pdw-overlay {
+  margin: 2px 0 3px;
+  padding: 3px 6px;
+  background: #eff6ff; border-left: 2px solid #93c5fd;
+  border-radius: 0 3px 3px 0;
+}
+.pdw-overlay-label {
+  display: block; font-size: 8px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #6b7280; margin-bottom: 2px;
+}
+.pdw-overlay-event {
+  font-size: 9.5px; color: #1e3a8a; line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pdw-overlay-time { font-weight: 700; margin-right: 3px; }
+.pdw-overlay-title {}
 `;
 
   // ── Preflight: assert no unsupported CSS color functions ──────────────────
@@ -437,7 +490,7 @@ body { font-family: Arial, Helvetica, sans-serif; }
 
   // ── Public: generate monthly overview PDF ─────────────────────────────────
 
-  async function generateMonthlyOverviewPDF(calendarData, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode) {
+  async function generateMonthlyOverviewPDF(calendarData, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode, overlayEventsByDate) {
     const { jsPDF } = window.jspdf;
     const months = Object.keys(calendarData).sort();
     if (months.length === 0) return false;
@@ -450,7 +503,7 @@ body { font-family: Arial, Helvetica, sans-serif; }
     for (let i = 0; i < months.length; i++) {
       const monthKey = months[i];
       const days     = calendarData[monthKey] || [];
-      const pageHTML = buildMonthlyPageHTML(monthKey, days, selectedClasses, scheduleAssignments, scheduleCategories, dutyColorMode);
+      const pageHTML = buildMonthlyPageHTML(monthKey, days, selectedClasses, scheduleAssignments, scheduleCategories, dutyColorMode, overlayEventsByDate);
 
       container.innerHTML = `<style>${MONTHLY_CSS}</style>${pageHTML}`;
       await waitFrames();
@@ -476,7 +529,7 @@ body { font-family: Arial, Helvetica, sans-serif; }
 
   // ── Public: generate daily list PDF (one page per school week) ────────────
 
-  async function generateDailyListPDF(calendarData, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode) {
+  async function generateDailyListPDF(calendarData, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode, overlayEventsByDate) {
     const { jsPDF } = window.jspdf;
     const weeks = groupCalendarDaysByWeek(calendarData);
     if (weeks.length === 0) return false;
@@ -489,7 +542,7 @@ body { font-family: Arial, Helvetica, sans-serif; }
     for (let i = 0; i < weeks.length; i++) {
       const { days } = weeks[i];
       const weekLabel = formatWeekLabel(days);
-      const pageHTML  = buildWeekPageHTML(weekLabel, days, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode);
+      const pageHTML  = buildWeekPageHTML(weekLabel, days, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode, overlayEventsByDate);
 
       container.innerHTML = `<style>${WEEKLY_CSS}</style>${pageHTML}`;
       await waitFrames();

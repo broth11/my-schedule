@@ -21,6 +21,10 @@ if (window.pdfjsLib) {
       let useImportedData = false;
       let scheduleAssignments = {};
 
+      // Structured overlay events from imported ICS files, keyed by "YYYY-MM-DD".
+      // Separate from cycle-day calendar; never overwrites cycle codes.
+      let calendarOverlayEventsByDate = {};
+
       const {
           DAY_LETTERS,
           buildBlockCode,
@@ -32,11 +36,20 @@ if (window.pdfjsLib) {
           loadImportedCalendarState,
           saveImportedCalendarState,
           clearImportedCalendarState,
+          loadOverlayEvents,
+          saveOverlayEvents,
+          clearOverlayEvents,
           loadDateRange,
           saveDateRange: saveStoredDateRange,
           clearDateRange: clearStoredDateRange,
           migrateStoredStateIfNeeded
       } = window.LocalStorageStore;
+
+      const {
+          buildOverlayEventsFromICS,
+          mergeOverlayEvents,
+          filterOverlayToMonths,
+      } = window.OverlayHelpers;
       const DAY_BLOCK_ORDER = ['1', '2', '3', '4', 'FX', 'ELB', '5'];
 
       function getSlotFromCode(code) {
@@ -271,8 +284,13 @@ if (window.pdfjsLib) {
                   newCalendarData
               );
 
+              // Build structured overlay events (separate from cycle-day structure)
+              const newOverlay = buildOverlayEventsFromICS(allEvents);
+              calendarOverlayEventsByDate = mergeOverlayEvents(calendarOverlayEventsByDate, newOverlay);
+
               useImportedData = true;
               saveImportedCalendarState({ importedCalendarData, useImportedData });
+              saveOverlayEvents(calendarOverlayEventsByDate);
 
               // Reset to first available month in the imported data
               const availableMonths = Object.keys(getFilteredCalendarData()).sort();
@@ -332,7 +350,10 @@ if (window.pdfjsLib) {
                       events.push({
                           date: dateKey,
                           summary: summary,
-                          description: event.description || ''
+                          description: event.description || '',
+                          allDay: true,
+                          startTime: null,
+                          endTime: null,
                       });
 
                       currentDate.setDate(currentDate.getDate() + 1);
@@ -344,10 +365,20 @@ if (window.pdfjsLib) {
                   const day = String(startDate.day).padStart(2, '0');
                   const dateKey = `${year}-${month}-${day}`;
 
+                  const isAllDay = Boolean(startDate.isDate);
+                  const startTime = isAllDay ? null
+                      : `${String(startDate.hour).padStart(2,'0')}:${String(startDate.minute).padStart(2,'0')}`;
+                  const endTime = (endDate && !endDate.isDate)
+                      ? `${String(endDate.hour).padStart(2,'0')}:${String(endDate.minute).padStart(2,'0')}`
+                      : null;
+
                   events.push({
                       date: dateKey,
                       summary: summary,
-                      description: event.description || ''
+                      description: event.description || '',
+                      allDay: isAllDay,
+                      startTime,
+                      endTime,
                   });
               }
           });
@@ -437,7 +468,9 @@ if (window.pdfjsLib) {
           if (confirm('Clear all imported calendar data and return to default calendar?')) {
               importedCalendarData = {};
               useImportedData = false;
+              calendarOverlayEventsByDate = {};
               clearImportedCalendarState();
+              clearOverlayEvents();
               showToast('Cleared imported calendar');
 
               const availableMonths = Object.keys(getFilteredCalendarData()).sort();
@@ -449,10 +482,14 @@ if (window.pdfjsLib) {
           }
       }
 
-      // Get active calendar data (imported or built-in)
+      // Get active calendar data.
+      // Built-in school-year JSON is always the authoritative cycle-day source.
+      // Imported ICS data is merged on top: ICS cycle codes take precedence where
+      // provided (for ICS-as-cycle-calendar use), but built-in fills in everywhere
+      // the ICS has no cycle info (preserving the school year structure).
       function getActiveCalendarData() {
           if (useImportedData && Object.keys(importedCalendarData).length > 0) {
-              return importedCalendarData;
+              return mergeCalendarDataObjects(defaultCalendarData, importedCalendarData);
           }
           return defaultCalendarData;
       }
@@ -894,13 +931,28 @@ if (window.pdfjsLib) {
                   </div>
               `;
 
+              // ── Overlay calendar events for this day ───────────────────
+              const overlayEvs = calendarOverlayEventsByDate[dayKey] || [];
+              const overlaySection = overlayEvs.length > 0
+                  ? `<div class="list-detail-overlay">
+                      <span class="list-detail-overlay-label">Calendar</span>
+                      ${overlayEvs.map(ev =>
+                          `<div class="list-detail-overlay-event">
+                            ${ev.startTime ? `<span class="list-detail-overlay-time">${ev.startTime}</span>` : ''}
+                            <span>${ev.title}</span>
+                          </div>`
+                      ).join('')}
+                    </div>`
+                  : '';
+
               // ── Expanded detail ────────────────────────────────────────
               let detailInner = '';
               if (isSpecial || !cycle) {
                   const noteText = dayData.note || '';
-                  detailInner = noteText
+                  const noteHtml = noteText
                       ? `<div class="list-detail-note">${noteText}</div>`
-                      : `<div class="list-detail-note list-detail-note--muted">No additional details.</div>`;
+                      : (overlayEvs.length === 0 ? `<div class="list-detail-note list-detail-note--muted">No additional details.</div>` : '');
+                  detailInner = overlaySection + noteHtml;
               } else {
                   const periods = getPeriodsForDay(cycle);
                   const detailRows = periods.map(code => {
@@ -929,7 +981,7 @@ if (window.pdfjsLib) {
                   const noteRow = dayData.note
                       ? `<div class="list-detail-note">${dayData.note}</div>`
                       : '';
-                  detailInner = detailRows + noteRow;
+                  detailInner = overlaySection + detailRows + noteRow;
               }
 
               html += `
@@ -1348,7 +1400,8 @@ if (window.pdfjsLib) {
           try {
               await window.PdfExport.generateMonthlyOverviewPDF(
                   calendarData, selectedClasses, scheduleAssignments,
-                  scheduleCategories, scheduleRooms, dutyColorMode
+                  scheduleCategories, scheduleRooms, dutyColorMode,
+                  calendarOverlayEventsByDate
               );
               closeExportModal();
               showToast('Monthly Overview PDF downloaded.');
@@ -1369,7 +1422,8 @@ if (window.pdfjsLib) {
           try {
               await window.PdfExport.generateDailyListPDF(
                   calendarData, selectedClasses, scheduleAssignments,
-                  scheduleCategories, scheduleRooms, dutyColorMode
+                  scheduleCategories, scheduleRooms, dutyColorMode,
+                  calendarOverlayEventsByDate
               );
               closeExportModal();
               showToast('Daily List PDF downloaded.');
@@ -1414,6 +1468,8 @@ if (window.pdfjsLib) {
               useImportedData = true;
               showToast('Using imported calendar data');
           }
+
+          calendarOverlayEventsByDate = loadOverlayEvents() || {};
 
           const savedDateRange = loadDateRange();
           if (savedDateRange.startDate) {

@@ -10,11 +10,12 @@
     }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
     const STORAGE_VERSION = 1;
-    const TEACHER_SCHEDULE_KEY = 'teacherSchedule';
+    const TEACHER_SCHEDULE_KEY  = 'teacherSchedule';
     const IMPORTED_CALENDAR_KEY = 'importedCalendar';
     const USE_IMPORTED_DATA_KEY = 'useImportedData';
-    const DATE_RANGE_START_KEY = 'dateRangeStart';
-    const DATE_RANGE_END_KEY = 'dateRangeEnd';
+    const OVERLAY_EVENTS_KEY    = 'calendarOverlayEvents';
+    const DATE_RANGE_START_KEY  = 'dateRangeStart';
+    const DATE_RANGE_END_KEY    = 'dateRangeEnd';
 
     const DEFAULT_TEACHER_SCHEDULE_SETTINGS = {
         version: STORAGE_VERSION,
@@ -144,6 +145,20 @@
         storage.removeItem(USE_IMPORTED_DATA_KEY);
     }
 
+    function loadOverlayEvents(storage = getDefaultStorage()) {
+        const data = readJson(storage, OVERLAY_EVENTS_KEY);
+        return isPlainObject(data) ? data : {};
+    }
+
+    function saveOverlayEvents(events, storage = getDefaultStorage()) {
+        writeJson(storage, OVERLAY_EVENTS_KEY, isPlainObject(events) ? events : {});
+    }
+
+    function clearOverlayEvents(storage = getDefaultStorage()) {
+        if (!storage) return;
+        storage.removeItem(OVERLAY_EVENTS_KEY);
+    }
+
     function loadDateRange(storage = getDefaultStorage()) {
         return {
             startDate: storage ? storage.getItem(DATE_RANGE_START_KEY) || '' : '',
@@ -171,6 +186,9 @@
         loadImportedCalendarState,
         saveImportedCalendarState,
         clearImportedCalendarState,
+        loadOverlayEvents,
+        saveOverlayEvents,
+        clearOverlayEvents,
         loadDateRange,
         saveDateRange,
         clearDateRange,

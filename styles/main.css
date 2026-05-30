@@ -814,6 +814,31 @@ body {
 .preview-footer-actions { display: flex; gap: 10px; }
 .preview-footer-actions .btn { width: auto; padding: 10px 22px; }
 
+/* ---------- Overlay calendar events in list detail ---------- */
+.list-detail-overlay {
+  padding: 6px 0 2px;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+}
+.list-detail-overlay-label {
+  display: block;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.list-detail-overlay-event {
+  display: flex; align-items: flex-start; gap: 5px;
+  font-size: 13px; color: var(--ink-2); font-weight: 500;
+  padding: 2px 0; line-height: 1.4;
+}
+.list-detail-overlay-event::before {
+  content: '•'; color: #3b82f6; flex-shrink: 0; font-size: 11px; margin-top: 2px;
+}
+.list-detail-overlay-time {
+  font-size: 11px; color: var(--muted); font-weight: 600;
+  flex-shrink: 0; white-space: nowrap;
+}
+
 /* ---------- Export PDF modal ---------- */
 .modal-backdrop {
   display: none;
