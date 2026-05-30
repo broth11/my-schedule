@@ -50,6 +50,17 @@ function runSource(source) {
 }
 
 sources.forEach((source, index) => {
+    if (!fs.existsSync(source.path)) {
+        if (source.name === 'real PDF') {
+            console.error(`Missing extracted text: ${source.path}`);
+            console.error('Run `npm run test:schedule-parser:pdf` first to generate extracted PDF text.');
+            process.exitCode = 1;
+            return;
+        }
+        console.error(`Missing fixture: ${source.path}`);
+        process.exitCode = 1;
+        return;
+    }
     if (index > 0) console.log('');
     runSource(source);
 });

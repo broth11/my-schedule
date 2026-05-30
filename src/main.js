@@ -162,26 +162,17 @@ if (window.pdfjsLib) {
           const file = event.target.files?.[0];
           if (!file) return;
 
-          showToast(`<i class="fa-solid fa-spinner fa-spin"></i> Processing teacher schedule: ${file.name}`, 'success');
+          showToast('Processing teacher schedule…');
 
           try {
               const arrayBuffer = await file.arrayBuffer();
               const rawText = await extractTextFromPDF(arrayBuffer);
               const parsed = parseTeacherScheduleText(rawText);
-
-              selectedClasses = new Set(parsed.selectedCodes);
-              scheduleAssignments = parsed.assignments;
-              saveSettings();
-              createClassGrid();
-              updateCalendar();
-
-              const planningNote = parsed.ignoredPlanningBlocks
-                  ? ` Ignored ${parsed.ignoredPlanningBlocks} planning block${parsed.ignoredPlanningBlocks === 1 ? '' : 's'}.`
-                  : '';
-              showToast(`<i class="fa-regular fa-circle-check"></i> Imported ${parsed.selectedCodes.length} scheduled block obligations from ${parsed.expressionCount} PDF expressions.${planningNote}`, 'success');
+              closePanel();
+              showImportPreview(parsed);
           } catch (error) {
               console.error('Error parsing teacher schedule PDF:', error);
-              showToast(`<i class="fa-regular fa-circle-xmark"></i> Teacher schedule import failed: ${error.message}`, 'error');
+              showToast(`Teacher schedule import failed: ${error.message}`, 'error');
           }
 
           event.target.value = '';
@@ -190,6 +181,8 @@ if (window.pdfjsLib) {
       function clearImportedSchedule() {
           selectedClasses = new Set();
           scheduleAssignments = {};
+          scheduleCategories = {};
+          scheduleRooms = {};
           saveSettings();
           createClassGrid();
           updateCalendar();
@@ -540,25 +533,50 @@ if (window.pdfjsLib) {
       }
 
       // State
-      let selectedClasses = new Set();
-      let currentView = 'monthly';
+      let selectedClasses    = new Set();
+      let scheduleCategories = {};
+      let scheduleRooms      = {};
+      let dutyColorMode      = 'single';  // 'single' | 'category'
+      let scheduleViewMode   = 'auto';    // 'auto' | 'month' | 'list'
+      let currentView        = 'monthly'; // derived; kept for PDF export compat
+      let expandedListDay    = null;      // date key of the currently-open list row
       let currentMonth = '2026-01';
       let currentWeekStart = null;
 
       // Initialize
       document.addEventListener('DOMContentLoaded', async () => {
           loadSettings();
+          refreshViewControl();
+          refreshDutyColorControl();
           createClassGrid();
 
-          // Panel buttons
+          // Settings panel
           document.getElementById('openBtn').onclick = openPanel;
           document.getElementById('closeBtn').onclick = closePanel;
           document.getElementById('overlay').onclick = closePanel;
-          document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
 
-          // "Show only my periods" toggle
-          document.getElementById('onlyMine').addEventListener('change', e => {
-              document.body.classList.toggle('only-mine', e.target.checked);
+          // Import preview panel
+          document.getElementById('previewBackdrop').onclick  = closePreviewPanel;
+          document.getElementById('previewCancelBtn').onclick = closePreviewPanel;
+          document.getElementById('previewApplyBtn').onclick  = applyImportPreview;
+
+          // Export PDF modal
+          document.getElementById('exportPdfBackdrop').onclick = closeExportModal;
+          document.getElementById('exportPdfCloseBtn').onclick = closeExportModal;
+          document.getElementById('exportPdfCancelBtn').onclick = closeExportModal;
+          document.getElementById('exportMonthlyBtn').onclick  = exportMonthlyOverview;
+          document.getElementById('exportDailyBtn').onclick    = exportDailyList;
+
+          document.addEventListener('keydown', e => {
+              if (e.key === 'Escape') {
+                  if (document.getElementById('exportPdfModal').classList.contains('open')) {
+                      closeExportModal();
+                  } else if (document.getElementById('importPreviewPanel').classList.contains('open')) {
+                      closePreviewPanel();
+                  } else {
+                      closePanel();
+                  }
+              }
           });
 
           await loadBuiltInCalendarData();
@@ -636,40 +654,90 @@ if (window.pdfjsLib) {
       // Update calendar view
       function updateCalendar() {
           const calendarView = document.getElementById('calendarView');
+          if (!calendarView) return;
+
           const filteredData = getFilteredCalendarData();
 
-          // Check if calendar is empty
           if (Object.keys(filteredData).length === 0) {
               if (calendarLoadError && !(useImportedData && Object.keys(importedCalendarData).length > 0)) {
                   calendarView.innerHTML = `
                     <div class="empty-state">
                       <h2>Calendar Data Unavailable</h2>
-                      <p>Could not load built-in school-year calendar data.<br>Check data/school-years/2025-2026.json or upload an ICS calendar.</p>
+                      <p>Could not load the built-in school-year calendar.<br>
+                         Check data/school-years/2025-2026.json or upload an ICS calendar.</p>
                       <button class="btn primary" onclick="document.getElementById('icsUpload').click()">Upload ICS Calendar</button>
-                    </div>
-                  `;
+                    </div>`;
                   return;
               }
-
               calendarView.innerHTML = `
                 <div class="empty-state">
                   <h2>No Calendar Data</h2>
                   <p>Upload your ICS calendar files to get started, or your teacher schedule PDF to auto-fill the teaching blocks.</p>
                   <button class="btn primary" onclick="document.getElementById('icsUpload').click()">Upload ICS Calendar</button>
-                </div>
-              `;
+                </div>`;
               return;
           }
 
-          if (currentView === 'monthly') {
+          const view = getEffectiveScheduleView();
+          currentView = view; // keep in sync for PDF export
+
+          if (view === 'monthly') {
               calendarView.innerHTML = renderMonthlyView();
           } else {
-              calendarView.innerHTML = renderWeeklyView();
+              calendarView.innerHTML = renderListView();
           }
       }
 
+      // Re-render when viewport crosses the auto-mode breakpoint.
+      (function () {
+          let _lastView = null;
+          function _onResize() {
+              if (scheduleViewMode !== 'auto') return;
+              const v = getEffectiveScheduleView();
+              if (v !== _lastView) { _lastView = v; updateCalendar(); }
+          }
+          window.addEventListener('resize', _onResize);
+      })();
+
       const SPECIAL_CYCLES = ['HOLIDAY', 'IN-SERVICE', 'PTC', 'SONGKRAN', 'NO-SCHOOL'];
       const NEUTRAL_CYCLES = ['IN-SERVICE', 'PTC'];
+
+      const CATEGORY_META = [
+          { cat: 'teaching',  label: 'Teaching'  },
+          { cat: 'homeroom',  label: 'Homeroom'  },
+          { cat: 'advisory',  label: 'Advisory'  },
+          { cat: 'elb',       label: 'ELB'       },
+          { cat: 'planning',  label: 'Planning'  },
+          { cat: 'other',     label: 'Other'     }
+      ];
+
+      function renderLegend() {
+          if (dutyColorMode === 'category') {
+              // Only show categories that have at least one assigned block.
+              const usedCats = new Set(
+                  Array.from(selectedClasses).map(code => getBlockCategory(code) || 'teaching')
+              );
+              const catSwatches = CATEGORY_META
+                  .filter(m => usedCats.has(m.cat))
+                  .map(m => `<div class="grp"><span class="swatch-on cat-${m.cat}">${m.cat === 'other' ? '?' : '1'}</span> ${m.label}</div>`)
+                  .join('');
+              return `<div class="legend">
+                  ${catSwatches || '<div class="grp"><span class="swatch-off">1</span> No duties selected</div>'}
+                  <div class="grp"><span class="swatch-off">1</span> No class</div>
+                  <span class="sep">·</span>
+                  <div class="grp"><span class="abbr">FX</span> Flex</div>
+                  <div class="grp"><span class="abbr">ELB</span> Ext. Learning</div>
+              </div>`;
+          }
+
+          return `<div class="legend">
+              <div class="grp"><span class="swatch-on">1</span> You teach</div>
+              <div class="grp"><span class="swatch-off">1</span> No class</div>
+              <span class="sep">·</span>
+              <div class="grp"><span class="abbr">FX</span> Flex period</div>
+              <div class="grp"><span class="abbr">ELB</span> Extended Learning Block</div>
+          </div>`;
+      }
 
       // Render monthly view
       function renderMonthlyView() {
@@ -688,13 +756,7 @@ if (window.pdfjsLib) {
                   <button onclick="nextMonth()">Next →</button>
                 </div>
               </div>
-              <div class="legend">
-                <div class="grp"><span class="swatch-on">1</span> You teach</div>
-                <div class="grp"><span class="swatch-off">1</span> No class</div>
-                <span class="sep">·</span>
-                <div class="grp"><span class="abbr">FX</span> Flex period</div>
-                <div class="grp"><span class="abbr">ELB</span> Extended Learning Block</div>
-              </div>
+              ${renderLegend()}
               <div class="weekdays">
                 <div class="weekday">Monday</div>
                 <div class="weekday">Tuesday</div>
@@ -768,86 +830,180 @@ if (window.pdfjsLib) {
           return html;
       }
 
-      // Render daily view
-      function renderWeeklyView() {
-          const days = getFilteredCalendarData()[currentMonth] || [];
+      // Render list view — compact expandable rows, works on all screen sizes.
+      function renderListView() {
+          const days        = getFilteredCalendarData()[currentMonth] || [];
           const [year, month] = currentMonth.split('-');
-          const monthName = new Date(year, parseInt(month) - 1).toLocaleDateString('en-US', { month: 'long' });
-          const today = new Date();
+          const monthName   = new Date(year, parseInt(month) - 1)
+              .toLocaleDateString('en-US', { month: 'long' });
+          const today       = new Date();
           const daysInMonth = new Date(year, parseInt(month), 0).getDate();
 
+          const dayMap = {};
+          days.forEach(d => { dayMap[d.date] = d; });
+
           let html = `
-            <section class="card">
+            <section class="card list-card">
               <div class="month-bar">
-                <h2 class="month-title">${monthName} <span class="month-year">${year}</span> <span style="font-size:14px;font-weight:500;color:var(--muted)">— Daily</span></h2>
+                <h2 class="month-title">${monthName} <span class="month-year">${year}</span></h2>
                 <div class="nav">
                   <button onclick="prevMonth()">← Previous</button>
                   <button onclick="nextMonth()">Next →</button>
                 </div>
               </div>
-              <div class="week-view" style="margin-top:20px">
+              <div class="list-view">
           `;
 
-          const dayMap = {};
-          days.forEach(d => { dayMap[d.date] = d; });
-
           for (let date = 1; date <= daysInMonth; date++) {
-              const currentDate = new Date(year, parseInt(month) - 1, date);
-              const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
-              const dayData = dayMap[date];
+              const jsDate  = new Date(year, parseInt(month) - 1, date);
+              const dow     = jsDate.getDay();
+              if (dow === 0 || dow === 6) continue; // skip weekends
 
+              const dayData = dayMap[date];
+              if (!dayData) continue; // skip calendar gaps
+
+              const dayKey  = `${year}-${String(month).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
               const isToday = today.getFullYear() == year &&
                               today.getMonth() + 1 == parseInt(month) &&
-                              today.getDate() == date;
+                              today.getDate()   == date;
+              const isExp   = expandedListDay === dayKey;
+              const cycle   = dayData.cycle;
+              const isSpecial = cycle && SPECIAL_CYCLES.includes(cycle);
+              const dayLabel  = jsDate.toLocaleDateString('en-US', { weekday: 'short' });
 
-              const dayClass = isToday ? 'week-day current-day' : 'week-day';
+              const rowClasses = [
+                  'list-day',
+                  isToday   ? 'today'    : '',
+                  isExp     ? 'expanded' : '',
+                  isSpecial ? 'special'  : '',
+                  !cycle    ? 'no-school': ''
+              ].filter(Boolean).join(' ');
 
-              if (dayData) {
-                  const periodsHTML = renderPeriodsInline(dayData.cycle);
-                  html += `
-                    <div class="${dayClass}">
-                      <div class="week-day-header">
-                        <div>
-                          <div class="week-day-title">${dayData.day}, ${monthName} ${dayData.date}</div>
-                          <div class="week-day-cycle">${dayData.cycle || 'No school'}</div>
-                        </div>
-                        <div class="week-periods">${periodsHTML}</div>
-                      </div>
-                      ${dayData.note ? `<div style="font-size:13px;color:var(--ink-2);margin-top:8px">${dayData.note}</div>` : ''}
-                    </div>
-                  `;
+              // ── Summary row ────────────────────────────────────────────
+              let summaryInner = `
+                  <div class="list-day-left">
+                    <span class="list-day-label">${dayLabel}</span>
+                    <span class="list-day-num">${date}</span>
+                    ${cycle && !isSpecial ? `<span class="list-cycle">${cycle}</span>` : ''}
+                    ${isSpecial           ? `<span class="tag list-tag">${cycle}</span>` : ''}
+                    ${!cycle              ? `<span class="list-no-school">No school</span>` : ''}
+                  </div>
+                  <div class="list-day-right">
+                    ${cycle && !isSpecial ? renderPeriods(cycle) : ''}
+                    <span class="list-chevron" aria-hidden="true"></span>
+                  </div>
+              `;
+
+              // ── Expanded detail ────────────────────────────────────────
+              let detailInner = '';
+              if (isSpecial || !cycle) {
+                  const noteText = dayData.note || '';
+                  detailInner = noteText
+                      ? `<div class="list-detail-note">${noteText}</div>`
+                      : `<div class="list-detail-note list-detail-note--muted">No additional details.</div>`;
               } else {
-                  html += `
-                    <div class="${dayClass}">
-                      <div class="week-day-header">
-                        <div>
-                          <div class="week-day-title">${dayOfWeek}, ${monthName} ${date}</div>
-                          <div class="week-day-cycle"></div>
-                        </div>
-                      </div>
-                    </div>
-                  `;
+                  const periods = getPeriodsForDay(cycle);
+                  const detailRows = periods.map(code => {
+                      const assigned = selectedClasses.has(code);
+                      const cat      = assigned ? (getBlockCategory(code) || 'teaching') : null;
+                      const title    = scheduleAssignments[code] || '';
+                      const room     = scheduleRooms[code]       || '';
+                      const label    = getSlotFromCode(code);
+                      const catLabel = cat
+                          ? { teaching:'Teaching', homeroom:'Homeroom', advisory:'Advisory',
+                              elb:'ELB', planning:'Planning', other:'Other' }[cat] || cat
+                          : '';
+
+                      const codeClass = assigned
+                          ? `list-detail-code on${dutyColorMode === 'category' ? ` cat-${cat}` : ''}`
+                          : 'list-detail-code off';
+
+                      return `<div class="list-detail-row${assigned ? ' assigned' : ''}">
+                          <span class="${codeClass}">${label}</span>
+                          ${catLabel ? `<span class="list-detail-cat">${catLabel}</span>` : ''}
+                          ${title    ? `<span class="list-detail-title">${title}</span>` : ''}
+                          ${room     ? `<span class="list-detail-room">${room}</span>`   : ''}
+                      </div>`;
+                  }).join('');
+
+                  const noteRow = dayData.note
+                      ? `<div class="list-detail-note">${dayData.note}</div>`
+                      : '';
+                  detailInner = detailRows + noteRow;
               }
+
+              html += `
+                <div class="${rowClasses}" data-day="${dayKey}"
+                     onclick="toggleListDay('${dayKey}')">
+                  <div class="list-day-summary">${summaryInner}</div>
+                  <div class="list-day-detail">${detailInner}</div>
+                </div>
+              `;
           }
 
           html += `</div></section>`;
           return html;
       }
 
-      // Render periods inline (just dots, no labels)
-      function renderPeriodsInline(cycleCode) {
-          if (!cycleCode || cycleCode === 'HOLIDAY' || cycleCode === 'IN-SERVICE' ||
-              cycleCode === 'PTC' || cycleCode === 'SONGKRAN') {
-              return '';
+      // Toggle the expanded state of a list-view day row without a full re-render.
+      function toggleListDay(key) {
+          const el = document.querySelector(`.list-day[data-day="${key}"]`);
+          if (!el) return;
+          const wasExpanded = el.classList.contains('expanded');
+
+          // Collapse any open row
+          document.querySelectorAll('.list-day.expanded').forEach(d => d.classList.remove('expanded'));
+
+          if (!wasExpanded) {
+              el.classList.add('expanded');
+              expandedListDay = key;
+          } else {
+              expandedListDay = null;
           }
+      }
+
+      // Return the category for a block code, falling back to 'teaching' for
+      // assigned blocks with no recorded category (manually toggled via the grid).
+      function getBlockCategory(code) {
+          return scheduleCategories[code] || (selectedClasses.has(code) ? 'teaching' : null);
+      }
+
+      // CSS classes for a single pill in the monthly strip.
+      function getPillClass(code) {
+          const on = selectedClasses.has(code);
+          if (!on) return 'pill';
+          if (dutyColorMode === 'category') {
+              return `pill on cat-${getBlockCategory(code) || 'teaching'}`;
+          }
+          return 'pill on';
+      }
+
+      // Render periods inline for the daily view.
+      function renderPeriodsInline(cycleCode) {
+          if (!cycleCode || SPECIAL_CYCLES.includes(cycleCode)) return '';
 
           const periods = getPeriodsForDay(cycleCode);
 
           return periods.map(p => {
-              const isTeaching = selectedClasses.has(p);
-              const displayLabel = formatInlinePeriodLabel(p);
-              const extraClass = isLongInlineLabel(p) ? ' long-label' : '';
-              return `<div class="period-dot ${isTeaching ? 'teaching' : 'free'}${extraClass}" title="${getBlockTooltip(p)}">${displayLabel}</div>`;
+              const isAssigned = selectedClasses.has(p);
+              const label      = formatInlinePeriodLabel(p);
+              const tooltip    = getBlockTooltip(p);
+
+              if (!isAssigned) {
+                  return `<div class="period-dot free" title="${tooltip}">${label}</div>`;
+              }
+
+              if (dutyColorMode === 'category') {
+                  const cat   = getBlockCategory(p) || 'teaching';
+                  const title = scheduleAssignments[p] || '';
+                  const short = title.length > 11 ? title.slice(0, 11) + '…' : title;
+                  return `<div class="period-dot teaching cat-${cat}" title="${tooltip}">` +
+                      `<span class="dot-code">${label}</span>` +
+                      (short ? `<span class="dot-title">${short}</span>` : '') +
+                      `</div>`;
+              }
+
+              return `<div class="period-dot teaching" title="${tooltip}">${label}</div>`;
           }).join('');
       }
 
@@ -870,14 +1026,224 @@ if (window.pdfjsLib) {
               const periods = getPeriodsForDay(cycleCode);
               teachCount = periods.filter(p => selectedClasses.has(p)).length;
               pills = periods.map(p => {
-                  const on = selectedClasses.has(p);
                   const label = getSlotFromCode(p);
-                  return `<div class="pill${on ? ' on' : ''}" title="${getBlockTooltip(p)}">${label}</div>`;
+                  return `<div class="${getPillClass(p)}" title="${getBlockTooltip(p)}">${label}</div>`;
               }).join('');
           }
 
           return `<div class="periods${teachCount === 0 && !isSpecial ? ' none' : ''}">${pills}</div>`;
       }
+
+      // ── Schedule view mode ──────────────────────────────────────────────
+
+      const VIEW_BREAKPOINT = 680; // px — below this auto-mode shows list
+
+      function getEffectiveScheduleView() {
+          if (scheduleViewMode === 'month') return 'monthly';
+          if (scheduleViewMode === 'list')  return 'list';
+          // auto: respond to viewport width
+          return window.innerWidth <= VIEW_BREAKPOINT ? 'list' : 'monthly';
+      }
+
+      function refreshViewControl() {
+          const el = document.getElementById('viewControl');
+          if (!el) return;
+          el.querySelectorAll('.seg-btn').forEach(btn => {
+              btn.classList.toggle('active', btn.dataset.mode === scheduleViewMode);
+          });
+      }
+
+      function setScheduleViewMode(mode) {
+          scheduleViewMode = ['auto', 'month', 'list'].includes(mode) ? mode : 'auto';
+          expandedListDay  = null;
+          refreshViewControl();
+          saveSettings();
+          updateCalendar();
+      }
+
+      // ── Duty color mode ────────────────────────────────────────────────
+
+      function refreshDutyColorControl() {
+          document.querySelectorAll('#dutyColorControl .seg-btn').forEach(btn => {
+              btn.classList.toggle('active', btn.dataset.mode === dutyColorMode);
+          });
+      }
+
+      function setDutyColorMode(mode) {
+          dutyColorMode = mode === 'category' ? 'category' : 'single';
+          refreshDutyColorControl();
+          saveSettings();
+          updateCalendar();
+      }
+
+      // ── Import preview ──────────────────────────────────────────────────
+
+      const PREVIEW_CATEGORY_OPTIONS = ['teaching', 'homeroom', 'advisory', 'elb', 'planning', 'other'];
+      const PREVIEW_CATEGORY_LABELS  = {
+          teaching: 'Teaching',
+          homeroom: 'Homeroom',
+          advisory: 'Advisory',
+          elb:      'ELB',
+          planning: 'Planning',
+          other:    'Other'
+      };
+
+      let pendingPreviewRows = [];
+
+      function openPreviewPanel() {
+          document.getElementById('previewBackdrop').classList.add('open');
+          document.getElementById('importPreviewPanel').classList.add('open');
+      }
+
+      function closePreviewPanel() {
+          document.getElementById('previewBackdrop').classList.remove('open');
+          document.getElementById('importPreviewPanel').classList.remove('open');
+          pendingPreviewRows = [];
+      }
+
+      function applyImportPreview() {
+          const newSelectedClasses  = new Set();
+          const newAssignments      = {};
+          const newCategories       = {};
+          const newRooms            = {};
+
+          pendingPreviewRows.forEach(row => {
+              newCategories[row.blockCode] = row.category;
+              if (row.title) newAssignments[row.blockCode] = row.title;
+              if (row.room)  newRooms[row.blockCode]       = row.room;
+              if (row.included) newSelectedClasses.add(row.blockCode);
+          });
+
+          selectedClasses      = newSelectedClasses;
+          scheduleAssignments  = newAssignments;
+          scheduleCategories   = newCategories;
+          scheduleRooms        = newRooms;
+
+          saveSettings();
+          createClassGrid();
+          updateCalendar();
+          closePreviewPanel();
+
+          const count = newSelectedClasses.size;
+          showToast(`Applied ${count} block${count === 1 ? '' : 's'} from import`);
+      }
+
+      function _previewIncludedCount() {
+          return pendingPreviewRows.filter(r => r.included).length;
+      }
+
+      function _updatePreviewCounts() {
+          const included = _previewIncludedCount();
+          const total    = pendingPreviewRows.length;
+          const subtitle = document.getElementById('previewSubtitle');
+          const footInfo = document.getElementById('previewFooterInfo');
+          if (subtitle) subtitle.textContent =
+              `${total} block${total === 1 ? '' : 's'} detected · ${included} selected`;
+          if (footInfo) footInfo.textContent =
+              `${included} block${included === 1 ? '' : 's'} will be applied`;
+      }
+
+      function _buildPreviewRows(parsed) {
+          // Combine teaching blocks and planning/ignored blocks, sort non-planning first.
+          const all = [
+              ...parsed.blocks,
+              ...parsed.ignoredBlocks
+          ].sort((a, b) => {
+              const ap = a.category === 'planning' ? 1 : 0;
+              const bp = b.category === 'planning' ? 1 : 0;
+              if (ap !== bp) return ap - bp;
+              return a.blockCode.localeCompare(b.blockCode);
+          });
+
+          return all.map(block => ({
+              blockCode:  block.blockCode,
+              category:   block.category,
+              title:      block.title   || '',
+              room:       block.room    || '',
+              sourceText: block.sourceText || '',
+              included:   block.category !== 'planning'
+          }));
+      }
+
+      function _renderPreviewTableBody() {
+          const tbody = document.getElementById('previewTableBody');
+          if (!tbody) return;
+          tbody.innerHTML = '';
+
+          pendingPreviewRows.forEach((row, index) => {
+              const tr = document.createElement('tr');
+              tr.className = `preview-row${row.included ? '' : ' excluded'}`;
+
+              // Checkbox
+              const tdCheck   = document.createElement('td');
+              const checkbox  = document.createElement('input');
+              checkbox.type   = 'checkbox';
+              checkbox.className = 'preview-check';
+              checkbox.checked   = row.included;
+              checkbox.addEventListener('change', () => {
+                  pendingPreviewRows[index].included = checkbox.checked;
+                  tr.classList.toggle('excluded', !checkbox.checked);
+                  _updatePreviewCounts();
+              });
+              tdCheck.appendChild(checkbox);
+
+              // Block code
+              const tdCode = document.createElement('td');
+              const codeChip = document.createElement('span');
+              codeChip.className = `preview-code cat-${row.category}`;
+              codeChip.textContent = row.blockCode;
+              tdCode.appendChild(codeChip);
+
+              // Category select
+              const tdCat  = document.createElement('td');
+              const select = document.createElement('select');
+              select.className = `preview-cat-select cat-${row.category}`;
+              PREVIEW_CATEGORY_OPTIONS.forEach(cat => {
+                  const opt      = document.createElement('option');
+                  opt.value      = cat;
+                  opt.textContent = PREVIEW_CATEGORY_LABELS[cat];
+                  opt.selected   = cat === row.category;
+                  select.appendChild(opt);
+              });
+              select.addEventListener('change', () => {
+                  const newCat = select.value;
+                  pendingPreviewRows[index].category = newCat;
+                  select.className   = `preview-cat-select cat-${newCat}`;
+                  codeChip.className = `preview-code cat-${newCat}`;
+              });
+              tdCat.appendChild(select);
+
+              // Title
+              const tdTitle = document.createElement('td');
+              tdTitle.className   = 'preview-title';
+              tdTitle.textContent = row.title || '—';
+
+              // Room
+              const tdRoom = document.createElement('td');
+              tdRoom.className   = 'preview-room';
+              tdRoom.textContent = row.room || '—';
+
+              // Source (truncated, full text in tooltip)
+              const tdSrc = document.createElement('td');
+              tdSrc.className   = 'preview-source';
+              tdSrc.title       = row.sourceText;
+              tdSrc.textContent = row.sourceText.length > 55
+                  ? row.sourceText.slice(0, 55) + '…'
+                  : row.sourceText;
+
+              tr.append(tdCheck, tdCode, tdCat, tdTitle, tdRoom, tdSrc);
+              tbody.appendChild(tr);
+          });
+      }
+
+      function showImportPreview(parsed) {
+          pendingPreviewRows = _buildPreviewRows(parsed);
+          _renderPreviewTableBody();
+          _updatePreviewCounts();
+          openPreviewPanel();
+      }
+
+      // ── End import preview ──────────────────────────────────────────────
 
       // Navigation
       function prevMonth() {
@@ -898,25 +1264,10 @@ if (window.pdfjsLib) {
           }
       }
 
-      // View toggles
-      function refreshDisplayModeButtons() {
-          const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-          document.getElementById('monthlyBtn').classList.toggle('active', currentView === 'monthly');
-          document.getElementById('weeklyBtn').classList.toggle('active', currentView === 'weekly');
-          document.getElementById('lightModeBtn').classList.toggle('active', !isDark);
-          document.getElementById('darkModeBtn').classList.toggle('active', isDark);
-      }
-
+      // View toggles (legacy setView kept for PDF export compatibility)
       function setView(view) {
           currentView = view;
-          refreshDisplayModeButtons();
-
-          // Set body class for print orientation
-          document.body.className = `view-${view}`;
-
-          // Update print orientation style
           updatePrintOrientation();
-
           updateCalendar();
       }
 
@@ -953,84 +1304,96 @@ if (window.pdfjsLib) {
           } else {
               html.setAttribute('data-theme', '');
           }
-          refreshDisplayModeButtons();
           saveSettings();
       }
 
-      // Color customization
+      // Color customization (guards against missing inputs)
       function updateColors() {
-          const teachingColor = sanitizeHexColor(document.getElementById('teachingColor').value, '#10b981');
-          const freeColor = sanitizeHexColor(document.getElementById('freeColor').value, '#e5e7eb');
-          document.getElementById('teachingColor').value = teachingColor;
-          document.getElementById('freeColor').value = freeColor;
+          const tcEl = document.getElementById('teachingColor');
+          const fcEl = document.getElementById('freeColor');
+          if (!tcEl || !fcEl) return;
+          const teachingColor = sanitizeHexColor(tcEl.value, '#10b981');
+          const freeColor     = sanitizeHexColor(fcEl.value, '#e5e7eb');
+          tcEl.value = teachingColor;
+          fcEl.value = freeColor;
           document.documentElement.style.setProperty('--teaching-color', teachingColor);
           document.documentElement.style.setProperty('--free-color', freeColor);
           refreshColorSwatches();
           saveSettings();
       }
 
-      // Export to PDF
-      async function exportToPDF() {
-          const { jsPDF } = window.jspdf;
-          const months = Object.keys(getFilteredCalendarData()).sort();
+      // ── Export PDF modal ────────────────────────────────────────────────────
 
-          if (months.length === 0) {
-              alert('No calendar data to export! Please upload ICS files first.');
+      function openExportModal() {
+          const calendarData = getFilteredCalendarData();
+          if (Object.keys(calendarData).length === 0) {
+              showToast('No calendar data to export. Upload an ICS calendar first.', 'error');
               return;
           }
-
-          const originalView = currentView;
-
-          // Create PDF with appropriate orientation
-          const orientation = currentView === 'monthly' ? 'landscape' : 'portrait';
-          const pdf = new jsPDF(orientation, 'mm', 'a4');
-
-          for (let i = 0; i < months.length; i++) {
-              currentMonth = months[i];
-              updateCalendar();
-
-              // Wait for render
-              await new Promise(resolve => setTimeout(resolve, 100));
-
-              const element = document.getElementById('calendarView');
-              const canvas = await html2canvas(element, {
-                  scale: 2.5, // Increased from 1.5 for better quality
-                  backgroundColor: '#ffffff',
-                  logging: false,
-                  useCORS: true
-              });
-
-              // Use PNG with good compression for sharper text
-              const imgData = canvas.toDataURL('image/png');
-
-              const pdfWidth = orientation === 'landscape' ? 297 : 210;
-              const pdfHeight = orientation === 'landscape' ? 210 : 297;
-
-              const imgWidth = pdfWidth - 20; // 10mm margin on each side
-              const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-              if (i > 0) pdf.addPage([pdfWidth, pdfHeight], orientation);
-
-              // Center the image
-              const xOffset = 10;
-              const yOffset = 10;
-
-              pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, Math.min(imgHeight, pdfHeight - 20));
-          }
-
-          pdf.save('teacher-schedule-2026.pdf');
-
-          // Reset to original view and first month
-          currentView = originalView;
-          currentMonth = months[0];
-          updateCalendar();
+          document.getElementById('exportPdfBackdrop').classList.add('open');
+          document.getElementById('exportPdfModal').classList.add('open');
+          document.getElementById('exportPdfCancelBtn').focus();
       }
+
+      function closeExportModal() {
+          document.getElementById('exportPdfBackdrop').classList.remove('open');
+          document.getElementById('exportPdfModal').classList.remove('open');
+      }
+
+      async function exportMonthlyOverview() {
+          const calendarData = getFilteredCalendarData();
+          const btn = document.getElementById('exportMonthlyBtn');
+          btn.classList.add('loading');
+          btn.disabled = true;
+          try {
+              await window.PdfExport.generateMonthlyOverviewPDF(
+                  calendarData, selectedClasses, scheduleAssignments,
+                  scheduleCategories, scheduleRooms, dutyColorMode
+              );
+              closeExportModal();
+              showToast('Monthly Overview PDF downloaded.');
+          } catch (err) {
+              console.error('Monthly PDF export failed:', err);
+              showToast('PDF export failed: ' + err.message, 'error');
+          } finally {
+              btn.classList.remove('loading');
+              btn.disabled = false;
+          }
+      }
+
+      async function exportDailyList() {
+          const calendarData = getFilteredCalendarData();
+          const btn = document.getElementById('exportDailyBtn');
+          btn.classList.add('loading');
+          btn.disabled = true;
+          try {
+              await window.PdfExport.generateDailyListPDF(
+                  calendarData, selectedClasses, scheduleAssignments,
+                  scheduleCategories, scheduleRooms, dutyColorMode
+              );
+              closeExportModal();
+              showToast('Daily List PDF downloaded.');
+          } catch (err) {
+              console.error('Daily list PDF export failed:', err);
+              showToast('PDF export failed: ' + err.message, 'error');
+          } finally {
+              btn.classList.remove('loading');
+              btn.disabled = false;
+          }
+      }
+
+      // Keep legacy name so any stale inline refs don't break.
+      function exportToPDF() { openExportModal(); }
 
       // LocalStorage
       function saveSettings() {
           saveTeacherScheduleSettings({
               selectedClasses: Array.from(selectedClasses),
-              scheduleAssignments
+              scheduleAssignments,
+              scheduleCategories,
+              scheduleRooms,
+              dutyColorMode,
+              scheduleViewMode
           });
       }
 
@@ -1038,8 +1401,12 @@ if (window.pdfjsLib) {
           migrateStoredStateIfNeeded();
 
           const settings = loadTeacherScheduleSettings();
-          selectedClasses = new Set(settings.selectedClasses || []);
+          selectedClasses     = new Set(settings.selectedClasses || []);
           scheduleAssignments = settings.scheduleAssignments || {};
+          scheduleCategories  = settings.scheduleCategories  || {};
+          scheduleRooms       = settings.scheduleRooms       || {};
+          dutyColorMode       = settings.dutyColorMode       || 'single';
+          scheduleViewMode    = settings.scheduleViewMode    || 'auto';
 
           const importedCalendarState = loadImportedCalendarState();
           if (importedCalendarState.useImportedData && Object.keys(importedCalendarState.importedCalendarData).length > 0) {

@@ -65,6 +65,18 @@ function compareMetadata(gridParsed, adminParsed) {
 async function main() {
     fs.mkdirSync(tmpDir, { recursive: true });
 
+    if (!fs.existsSync(gridPdfPath)) {
+        console.error(`Missing fixture: ${gridPdfPath}`);
+        console.error('Place the grid-format teacher schedule PDF at samples/schedule-ben.pdf to run this test.');
+        process.exit(1);
+    }
+    if (!fs.existsSync(adminPdfPath)) {
+        console.error(`Missing fixture: ${adminPdfPath}`);
+        console.error('Place the admin-table teacher schedule PDF at "Teacher Schedule - Roth, Benjamin 2500.pdf" (repo root) to run this test.');
+        console.error('This file is intentionally excluded from git (*.pdf). Obtain it from the school admin portal.');
+        process.exit(1);
+    }
+
     const gridText = await extractTextFromPdfFile(gridPdfPath);
     const adminText = await extractTextFromPdfFile(adminPdfPath);
     fs.writeFileSync(gridExtractedPath, gridText, 'utf8');

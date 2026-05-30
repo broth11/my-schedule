@@ -14,6 +14,13 @@ const tmpDir = path.join(__dirname, '..', 'tmp');
 const extractedTextPath = path.join(tmpDir, 'schedule-ben.extracted.txt');
 
 async function main() {
+    if (!fs.existsSync(pdfPath)) {
+        console.error(`Missing fixture: ${pdfPath}`);
+        console.error('Place the grid-format teacher schedule PDF at samples/schedule-ben.pdf to run this test.');
+        console.error('This file is intentionally excluded from git (*.pdf). Obtain it from the school admin portal.');
+        process.exit(1);
+    }
+
     let rawText = '';
     let parsed = null;
     let extractionError = null;

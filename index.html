@@ -46,13 +46,19 @@
         </div>
 
         <div class="section">
-          <div class="section-label">Display</div>
-          <div class="toggle-row">
-            <div>
-              <div class="t-label">Show only my periods</div>
-              <div class="t-help">Hide periods you don't teach for a calmer grid.</div>
-            </div>
-            <label class="switch"><input type="checkbox" id="onlyMine"><span class="slider"></span></label>
+          <div class="section-label">View</div>
+          <div class="seg-control" id="viewControl" role="group" aria-label="Schedule view mode">
+            <button class="seg-btn" data-mode="auto"  onclick="setScheduleViewMode('auto')">Auto</button>
+            <button class="seg-btn" data-mode="month" onclick="setScheduleViewMode('month')">Month</button>
+            <button class="seg-btn" data-mode="list"  onclick="setScheduleViewMode('list')">List</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Duty colors</div>
+          <div class="seg-control" id="dutyColorControl" role="group" aria-label="Duty color mode">
+            <button class="seg-btn" data-mode="single"   onclick="setDutyColorMode('single')">Single duty color</button>
+            <button class="seg-btn" data-mode="category" onclick="setDutyColorMode('category')">Color by duty type</button>
           </div>
         </div>
 
@@ -64,7 +70,7 @@
           <input type="file" id="icsUpload" accept=".ics" multiple style="display:none" onchange="handleICSUpload(event)" />
           <input type="file" id="teacherScheduleUpload" accept=".pdf" style="display:none" onchange="handleTeacherScheduleUpload(event)" />
           <div class="btn-stack">
-            <button class="btn primary" onclick="exportToPDF()">
+            <button class="btn primary" onclick="openExportModal()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
               Export PDF
             </button>
@@ -112,12 +118,84 @@
       </div>
     </aside>
 
+    <!-- Export PDF modal -->
+    <div class="modal-backdrop" id="exportPdfBackdrop" aria-hidden="true"></div>
+    <div class="modal" id="exportPdfModal" role="dialog" aria-modal="true" aria-labelledby="exportPdfTitle">
+      <div class="modal-head">
+        <h2 id="exportPdfTitle">Export PDF</h2>
+        <button class="close-btn" id="exportPdfCloseBtn" aria-label="Close export PDF dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-intro">Choose a layout for your PDF export. The file will download automatically.</p>
+        <div class="export-choices">
+          <button class="export-choice" id="exportMonthlyBtn" tabindex="0">
+            <svg class="export-choice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 14h2M11 14h2M15 14h2M7 18h2M11 18h2M15 18h2"/></svg>
+            <div>
+              <div class="export-choice-title">Monthly Overview</div>
+              <div class="export-choice-desc">A4 landscape &middot; one page per month &middot; compact grid with cycle days and block chips</div>
+            </div>
+          </button>
+          <button class="export-choice" id="exportDailyBtn" tabindex="0">
+            <svg class="export-choice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            <div>
+              <div class="export-choice-title">Daily List</div>
+              <div class="export-choice-desc">A4 portrait &middot; day-by-day detail with titles, categories, and room numbers</div>
+            </div>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="exportPdfCancelBtn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Import preview backdrop -->
+    <div class="preview-backdrop" id="previewBackdrop"></div>
+
+    <!-- Import preview panel -->
+    <aside class="preview-panel" id="importPreviewPanel" aria-label="Schedule import preview">
+      <div class="panel-head">
+        <div>
+          <h2>Schedule Import Preview</h2>
+          <p class="preview-subtitle" id="previewSubtitle"></p>
+        </div>
+        <button class="close-btn" id="previewCancelBtn" aria-label="Cancel import">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="preview-body">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th class="col-check">Include</th>
+              <th class="col-code">Block</th>
+              <th class="col-cat">Category</th>
+              <th class="col-title">Title</th>
+              <th class="col-room">Room</th>
+              <th class="col-source">Source</th>
+            </tr>
+          </thead>
+          <tbody id="previewTableBody"></tbody>
+        </table>
+      </div>
+      <div class="preview-footer">
+        <span class="preview-footer-info" id="previewFooterInfo"></span>
+        <div class="preview-footer-actions">
+          <button class="btn" id="previewCancelBtn2" onclick="document.getElementById('previewCancelBtn').click()">Cancel</button>
+          <button class="btn primary" id="previewApplyBtn">Apply</button>
+        </div>
+      </div>
+    </aside>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
     <script src="src/schedule/teacherScheduleParser.js"></script>
     <script src="src/storage/localStorageStore.js"></script>
+    <script src="src/export/pdfExport.js"></script>
     <script src="src/main.js"></script>
   </body>
 </html>

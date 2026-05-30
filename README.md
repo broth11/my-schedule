@@ -1,34 +1,52 @@
 # My Schedule
 
-My Schedule is a lightweight static teacher schedule planner for viewing RIS cycle-day schedules.
-
-The current app supports monthly and daily schedule views, manual block selection, teacher schedule PDF import, ICS import, light/dark mode, custom colors, localStorage persistence, and PDF export.
+A lightweight static teacher schedule planner for RIS cycle-day schedules. Supports monthly calendar view, manual block selection, teacher schedule PDF import, ICS import, localStorage persistence, and PDF export.
 
 ## Run Locally
 
-Serve the folder with any static file server, then open `index.html`. The built-in school-year calendar is loaded with `fetch()`, so directly opening the file may be blocked by browser file-access restrictions.
+Install dev dependencies (pdfjs-dist, used by tests only):
+
+```sh
+npm install
+```
+
+Serve the project folder with any static file server:
+
+```sh
+npx serve .
+```
+
+Then open `http://localhost:3000` in a browser. The built-in school-year calendar is loaded via `fetch()`, so opening `index.html` directly as a `file://` URL will be blocked by browser security restrictions.
 
 ## Tests
 
-Parser expectations and PDF extraction helpers live in `scripts/test-utils/`. Add future expected blocks, assignment titles, rooms, or shared parser assertions there instead of duplicating them in individual test scripts.
-
-Run the baseline teacher schedule parser test:
-
-```sh
-npm run test:schedule-parser
-```
-
-Run the parser against text extracted from the sample PDF:
-
-```sh
-npm run test:schedule-parser:pdf
-```
-
-Run all parser tests:
+Run all tests:
 
 ```sh
 npm test
 ```
+
+Individual test scripts:
+
+| Command | What it checks |
+|---|---|
+| `npm run test:schedule-parser` | Parser against the fixture text file |
+| `npm run test:schedule-parser:pdf` | Parser against `samples/schedule-ben.pdf` (requires PDF — see below) |
+| `npm run test:schedule-parser:metadata` | Block titles and rooms (requires PDF test to have run first) |
+| `npm run test:schedule-parser:cross-reference` | Grid vs admin-table PDF agreement (requires both PDFs — see below) |
+| `npm run test:calendar-converter` | ICS → school-year JSON converter |
+| `npm run test:storage` | localStorage module round-trip and migration |
+
+### PDF fixture requirement
+
+Two tests (`test:schedule-parser:pdf` and `test:schedule-parser:cross-reference`) read real teacher schedule PDFs. These files are excluded from git (`*.pdf` in `.gitignore`) and must be obtained from the school admin portal:
+
+- `samples/schedule-ben.pdf` — grid-format teacher schedule
+- `Teacher Schedule - Roth, Benjamin 2500.pdf` (repo root) — admin-table format
+
+Both tests exit with a clear error message if the file is missing.
+
+## Validate or convert calendar data
 
 Validate the built-in school-year JSON:
 
@@ -36,42 +54,27 @@ Validate the built-in school-year JSON:
 npm run validate:school-year
 ```
 
-Convert an official ICS export into school-year JSON:
+Convert an official RIS ICS export into school-year JSON:
 
 ```sh
 npm run convert:ics -- input.ics data/school-years/2026-2027.json
 ```
 
-Run the parser metadata checks for fixture and extracted PDF text:
-
-```sh
-npm run test:schedule-parser:metadata
-```
-
-Cross-check the grid PDF against the cleaner admin-table PDF:
-
-```sh
-npm run test:schedule-parser:cross-reference
-```
-
-Run the local browser storage module test:
-
-```sh
-npm run test:storage
-```
-
 ## Project Structure
 
-- `index.html` - static app shell and existing UI markup.
-- `styles/main.css` - extracted app styles.
-- `src/main.js` - extracted app logic.
-- `src/storage/localStorageStore.js` - local browser persistence helpers.
-- `data/school-years/2025-2026.json` - built-in RIS cycle calendar data.
-- `docs/calendar-data.md` - calendar JSON, ICS converter, and validation workflow.
-- `docs/` - planning and architecture notes.
-- `data/school-years/` - future home for school-year metadata.
-- `samples/` - sample files for future parser tests.
+```
+index.html                        static app shell
+styles/main.css                   app styles
+src/main.js                       app logic (calendar rendering, state, PDF export)
+src/schedule/teacherScheduleParser.js  teacher schedule PDF text parser
+src/storage/localStorageStore.js  localStorage persistence helpers
+data/school-years/2025-2026.json  built-in RIS cycle calendar
+samples/                          fixture files for parser tests
+scripts/                          Node test and utility scripts
+docs/                             architecture and planning notes
+.github/workflows/deploy.yml      GitHub Pages deployment
+```
 
 ## Scope
 
-The app should remain a focused schedule viewer. It should not become a task manager, reminder system, backend application, or Google Calendar editor.
+The app is a focused schedule viewer. It will not become a task manager, reminder system, backend application, or Google Calendar editor.

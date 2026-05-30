@@ -21,6 +21,9 @@
         selectedClasses: [],
         scheduleAssignments: {},
         scheduleCategories: {},
+        scheduleRooms: {},
+        dutyColorMode: 'single',
+        scheduleViewMode: 'auto',
         theme: 'light',
         teachingColor: '#10b981',
         freeColor: '#e5e7eb',
@@ -75,11 +78,14 @@
             selectedClasses: Array.isArray(source.selectedClasses) ? source.selectedClasses : [],
             scheduleAssignments: isPlainObject(source.scheduleAssignments) ? source.scheduleAssignments : {},
             scheduleCategories: isPlainObject(source.scheduleCategories) ? source.scheduleCategories : {},
+            scheduleRooms: isPlainObject(source.scheduleRooms) ? source.scheduleRooms : {},
             theme: normalizeTheme(source.theme, source.darkMode),
             teachingColor: typeof source.teachingColor === 'string' && source.teachingColor ? source.teachingColor : DEFAULT_TEACHER_SCHEDULE_SETTINGS.teachingColor,
             freeColor: typeof source.freeColor === 'string' && source.freeColor ? source.freeColor : DEFAULT_TEACHER_SCHEDULE_SETTINGS.freeColor,
             selectedSchoolYear: typeof source.selectedSchoolYear === 'string' && source.selectedSchoolYear ? source.selectedSchoolYear : DEFAULT_TEACHER_SCHEDULE_SETTINGS.selectedSchoolYear,
-            preferredView: typeof source.preferredView === 'string' && source.preferredView ? source.preferredView : DEFAULT_TEACHER_SCHEDULE_SETTINGS.preferredView
+            preferredView: typeof source.preferredView === 'string' && source.preferredView ? source.preferredView : DEFAULT_TEACHER_SCHEDULE_SETTINGS.preferredView,
+            dutyColorMode: source.dutyColorMode === 'category' ? 'category' : 'single',
+            scheduleViewMode: ['auto', 'month', 'list'].includes(source.scheduleViewMode) ? source.scheduleViewMode : 'auto'
         };
     }
 
