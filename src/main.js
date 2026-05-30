@@ -970,11 +970,21 @@ if (window.pdfjsLib) {
                           ? `list-detail-code on${dutyColorMode === 'category' ? ` cat-${cat}` : ''}`
                           : 'list-detail-code off';
 
+                      // Title is the primary label; category is secondary metadata.
+                      // When an assigned block has no imported title, show the category
+                      // as a muted italic fallback rather than the uppercase category badge.
+                      const titleHtml = title
+                          ? `<span class="list-detail-title">${title}</span>`
+                          : (assigned ? `<span class="list-detail-title list-detail-title--fallback">${catLabel}</span>` : '');
+                      const catHtml = (title && catLabel)
+                          ? `<span class="list-detail-cat">${catLabel}</span>`
+                          : '';
+
                       return `<div class="list-detail-row${assigned ? ' assigned' : ''}">
                           <span class="${codeClass}">${label}</span>
-                          ${catLabel ? `<span class="list-detail-cat">${catLabel}</span>` : ''}
-                          ${title    ? `<span class="list-detail-title">${title}</span>` : ''}
-                          ${room     ? `<span class="list-detail-room">${room}</span>`   : ''}
+                          ${titleHtml}
+                          ${catHtml}
+                          ${room ? `<span class="list-detail-room">${room}</span>` : ''}
                       </div>`;
                   }).join('');
 

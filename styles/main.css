@@ -560,6 +560,9 @@ body {
   font-weight: 500; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.list-detail-title--fallback {
+  font-weight: 500; color: var(--muted); font-style: italic;
+}
 .list-detail-room {
   flex: none;
   font-size: 11.5px; font-weight: 600;
