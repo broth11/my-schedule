@@ -956,35 +956,27 @@ if (window.pdfjsLib) {
               } else {
                   const periods = getPeriodsForDay(cycle);
                   const detailRows = periods.map(code => {
-                      const assigned = selectedClasses.has(code);
-                      const cat      = assigned ? (getBlockCategory(code) || 'teaching') : null;
-                      const title    = scheduleAssignments[code] || '';
-                      const room     = scheduleRooms[code]       || '';
-                      const label    = getSlotFromCode(code);
-                      const catLabel = cat
-                          ? { teaching:'Teaching', homeroom:'Homeroom', advisory:'Advisory',
-                              elb:'ELB', planning:'Planning', other:'Other' }[cat] || cat
-                          : '';
+                      const di = getBlockDisplayInfo(code);
 
-                      const codeClass = assigned
-                          ? `list-detail-code on${dutyColorMode === 'category' ? ` cat-${cat}` : ''}`
+                      const codeClass = di.isAssigned
+                          ? `list-detail-code on${dutyColorMode === 'category' ? ` cat-${di.category}` : ''}`
                           : 'list-detail-code off';
 
-                      // Title is the primary label; category is secondary metadata.
-                      // When an assigned block has no imported title, show the category
-                      // as a muted italic fallback rather than the uppercase category badge.
-                      const titleHtml = title
-                          ? `<span class="list-detail-title">${title}</span>`
-                          : (assigned ? `<span class="list-detail-title list-detail-title--fallback">${catLabel}</span>` : '');
-                      const catHtml = (title && catLabel)
-                          ? `<span class="list-detail-cat">${catLabel}</span>`
+                      // Title is the primary label. "Teaching" may only appear as secondary category metadata.
+                      const titleHtml = di.title
+                          ? `<span class="list-detail-title">${di.title}</span>`
+                          : '';
+                      // Show category only when there is a real imported assignment title.
+                      const hasRealTitle = di.isAssigned && scheduleAssignments[code];
+                      const catHtml = (hasRealTitle && di.categoryLabel)
+                          ? `<span class="list-detail-cat">${di.categoryLabel}</span>`
                           : '';
 
-                      return `<div class="list-detail-row${assigned ? ' assigned' : ''}">
-                          <span class="${codeClass}">${label}</span>
+                      return `<div class="list-detail-row${di.isAssigned ? ' assigned' : ''}">
+                          <span class="${codeClass}">${di.slotLabel}</span>
                           ${titleHtml}
                           ${catHtml}
-                          ${room ? `<span class="list-detail-room">${room}</span>` : ''}
+                          ${di.room ? `<span class="list-detail-room">${di.room}</span>` : ''}
                       </div>`;
                   }).join('');
 
@@ -1028,6 +1020,24 @@ if (window.pdfjsLib) {
       // assigned blocks with no recorded category (manually toggled via the grid).
       function getBlockCategory(code) {
           return scheduleCategories[code] || (selectedClasses.has(code) ? 'teaching' : null);
+      }
+
+      // Authoritative display info for a single block code.
+      // title is the assignment title when one exists; "Assigned" when assigned but
+      // no imported title; "" when not assigned.
+      // "Teaching" may appear only in categoryLabel — never as the primary title.
+      function getBlockDisplayInfo(code) {
+          const slotLabel  = code.includes('-') ? code.split('-')[1] : code.slice(1);
+          const isAssigned = selectedClasses.has(code);
+          const rawTitle   = scheduleAssignments[code] || '';
+          const title      = isAssigned ? (rawTitle || 'Assigned') : '';
+          const category   = isAssigned ? (scheduleCategories[code] || 'teaching') : null;
+          const categoryLabel = category ? ({
+              teaching: 'Teaching', homeroom: 'Homeroom', advisory: 'Advisory',
+              elb: 'ELB', planning: 'Planning', other: 'Other'
+          }[category] || category) : '';
+          const room = scheduleRooms[code] || '';
+          return { code, slotLabel, isAssigned, title, category, categoryLabel, room };
       }
 
       // CSS classes for a single pill in the monthly strip.

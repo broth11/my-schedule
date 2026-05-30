@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "test": "npm run test:schedule-parser && npm run test:schedule-parser:pdf && npm run test:schedule-parser:metadata && npm run test:schedule-parser:cross-reference && npm run test:calendar-converter && npm run test:storage && npm run test:overlay-helpers",
+    "test": "npm run test:schedule-parser && npm run test:schedule-parser:pdf && npm run test:schedule-parser:metadata && npm run test:schedule-parser:cross-reference && npm run test:calendar-converter && npm run test:storage && npm run test:overlay-helpers && npm run test:block-display-info",
+    "test:block-display-info": "node scripts/test-block-display-info.js",
     "test:overlay-helpers": "node scripts/test-overlay-helpers.js",
     "convert:ics": "node scripts/convert-ics-to-school-year-json.js",
     "validate:school-year": "node scripts/validate-school-year-json.js data/school-years/2025-2026.json",

@@ -473,13 +473,7 @@
 
           let tx = DL_ML + chipW + 2;
 
-          // Category
-          if (catLbl) {
-            drawText(doc, catLbl, tx, curY, { size:7.5, color:CLR.catText });
-            tx += 18;
-          }
-
-          // Room badge (right-aligned, drawn before title so we know its width)
+          // Room badge (right-aligned — drawn first to know its width for title budget)
           let roomBadgeW = 0;
           if (room) {
             const rTextW   = getTextW(doc, room, 7, false);
@@ -490,13 +484,24 @@
             drawText(doc, room, rx + 1.5, curY, { size:7, color:CLR.roomText });
           }
 
-          // Title
-          if (title) {
-            const maxTW = DL_W - DL_MR - tx - roomBadgeW - (room ? 3 : 0);
-            const tDisp = truncate(doc, title, maxTW, 7.5, true);
-            drawText(doc, tDisp, tx, curY, { size:7.5, bold:true, color:CLR.black });
-          } else if (!assigned) {
+          // Category width budget (secondary — drawn after title)
+          const catBadgeW = catLbl ? getTextW(doc, catLbl, 7, false) + 4 : 0;
+
+          // Title (primary — bold, immediately after chip)
+          // Use assignment title when available; fall back to "Assigned" for assigned blocks.
+          const titleText = title || (assigned ? 'Assigned' : '');
+          if (titleText) {
+            const maxTW = DL_W - DL_MR - tx - catBadgeW - roomBadgeW - (room ? 3 : 0);
+            const tDisp = truncate(doc, titleText, maxTW, 7.5, true);
+            const tW    = drawText(doc, tDisp, tx, curY, { size:7.5, bold:true, color:CLR.black });
+            tx += tW + 3;
+          } else {
             drawText(doc, '—', tx, curY, { size:7.5, color:'#cccccc' });
+          }
+
+          // Category (secondary — muted, after title; only shown when a real assignment title exists)
+          if (catLbl && title) {
+            drawText(doc, catLbl, tx, curY, { size:7, color:CLR.catText });
           }
 
           curY += 3.5;
