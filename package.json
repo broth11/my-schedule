@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "test": "npm run test:schedule-parser && npm run test:schedule-parser:pdf && npm run test:schedule-parser:metadata && npm run test:schedule-parser:cross-reference && npm run test:calendar-converter && npm run test:storage",
+    "convert:ics": "node scripts/convert-ics-to-school-year-json.js",
+    "validate:school-year": "node scripts/validate-school-year-json.js data/school-years/2025-2026.json",
+    "test:calendar-converter": "node scripts/test-ics-to-school-year-json.js",
+    "test:storage": "node scripts/test-local-storage-store.js",
+    "test:schedule-parser": "node scripts/test-schedule-parser.js",
+    "test:schedule-parser:pdf": "node scripts/test-schedule-parser-pdf.js",
+    "test:schedule-parser:metadata": "node scripts/test-schedule-parser-metadata.js",
+    "test:schedule-parser:cross-reference": "node scripts/test-schedule-parser-cross-reference.js"
+  },
+  "devDependencies": {
+    "pdfjs-dist": "^3.11.174"
+  }
+}

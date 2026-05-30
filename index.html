@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teacher Schedule Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css" />
+  </head>
+  <body>
+    <header class="app-head">
+      <h1 class="app-title">Teacher Schedule Planner</h1>
+      <p class="app-sub">RIS Cycle Day Calendar</p>
+      <button class="menu-btn" id="openBtn" aria-label="Open settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+    </header>
+
+    <main class="wrap">
+      <div id="calendarView"></div>
+    </main>
+
+    <!-- Toast notification -->
+    <div class="toast" id="uploadStatus" aria-live="polite"></div>
+
+    <!-- Settings overlay -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Settings panel -->
+    <aside class="panel" id="panel" aria-label="Settings">
+      <div class="panel-head">
+        <h2>Settings</h2>
+        <button class="close-btn" id="closeBtn" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="panel-body">
+
+        <div class="section">
+          <div class="section-label">Your classes</div>
+          <div class="section-help">Tap the classes you teach. They'll light up on your calendar.</div>
+          <div class="class-grid" id="classGrid"></div>
+          <div class="count-line" id="countLine"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Display</div>
+          <div class="toggle-row">
+            <div>
+              <div class="t-label">Show only my periods</div>
+              <div class="t-help">Hide periods you don't teach for a calmer grid.</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="onlyMine"><span class="slider"></span></label>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section">
+          <div class="section-label">Schedule files</div>
+          <div class="section-help">Import your school calendar or teaching blocks, or export a copy.</div>
+          <input type="file" id="icsUpload" accept=".ics" multiple style="display:none" onchange="handleICSUpload(event)" />
+          <input type="file" id="teacherScheduleUpload" accept=".pdf" style="display:none" onchange="handleTeacherScheduleUpload(event)" />
+          <div class="btn-stack">
+            <button class="btn primary" onclick="exportToPDF()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+              Export PDF
+            </button>
+            <button class="btn" onclick="document.getElementById('icsUpload').click()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+              Upload ICS calendar
+            </button>
+            <button class="btn" onclick="document.getElementById('teacherScheduleUpload').click()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+              Upload teacher schedule PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Calendar range</div>
+          <div class="date-row">
+            <div class="date-field">
+              <label for="dateRangeStart">Start</label>
+              <input type="date" id="dateRangeStart" onchange="setDateRange()" />
+            </div>
+            <div class="date-field">
+              <label for="dateRangeEnd">End</label>
+              <input type="date" id="dateRangeEnd" onchange="setDateRange()" />
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section">
+          <div class="section-label">Reset</div>
+          <div class="btn-stack">
+            <button class="btn danger" onclick="clearImportedCalendar()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+              Clear calendar
+            </button>
+            <button class="btn danger" onclick="clearImportedSchedule()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l6-6m0 0l8-8 4 4-8 8m-4 4l-4-4 4-4"/></svg>
+              Clear teacher blocks
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
+    <script src="src/schedule/teacherScheduleParser.js"></script>
+    <script src="src/storage/localStorageStore.js"></script>
+    <script src="src/main.js"></script>
+  </body>
+</html>

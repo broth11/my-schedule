@@ -1,0 +1,592 @@
+{
+  "2026-01": [
+    {
+      "date": 6,
+      "day": "Mon",
+      "cycle": "HOLIDAY",
+      "note": "School Resumes"
+    },
+    {
+      "date": 7,
+      "day": "Tue",
+      "cycle": "A1"
+    },
+    {
+      "date": 8,
+      "day": "Wed",
+      "cycle": "B2"
+    },
+    {
+      "date": 9,
+      "day": "Thu",
+      "cycle": "C3"
+    },
+    {
+      "date": 12,
+      "day": "Mon",
+      "cycle": "D4"
+    },
+    {
+      "date": 13,
+      "day": "Tue",
+      "cycle": "A5"
+    },
+    {
+      "date": 14,
+      "day": "Wed",
+      "cycle": "B1"
+    },
+    {
+      "date": 15,
+      "day": "Thu",
+      "cycle": "C2"
+    },
+    {
+      "date": 16,
+      "day": "Fri",
+      "cycle": "D3"
+    },
+    {
+      "date": 19,
+      "day": "Mon",
+      "cycle": "A4"
+    },
+    {
+      "date": 20,
+      "day": "Tue",
+      "cycle": "B5"
+    },
+    {
+      "date": 21,
+      "day": "Wed",
+      "cycle": "C1"
+    },
+    {
+      "date": 22,
+      "day": "Thu",
+      "cycle": "D2"
+    },
+    {
+      "date": 23,
+      "day": "Fri",
+      "cycle": "A3"
+    },
+    {
+      "date": 26,
+      "day": "Mon",
+      "cycle": "IN-SERVICE"
+    },
+    {
+      "date": 27,
+      "day": "Tue",
+      "cycle": "B4"
+    },
+    {
+      "date": 28,
+      "day": "Wed",
+      "cycle": "C5"
+    },
+    {
+      "date": 29,
+      "day": "Thu",
+      "cycle": "D1"
+    },
+    {
+      "date": 30,
+      "day": "Fri",
+      "cycle": "A2"
+    }
+  ],
+  "2026-02": [
+    {
+      "date": 2,
+      "day": "Mon",
+      "cycle": "B3"
+    },
+    {
+      "date": 3,
+      "day": "Tue",
+      "cycle": "C4"
+    },
+    {
+      "date": 4,
+      "day": "Wed",
+      "cycle": "D5"
+    },
+    {
+      "date": 5,
+      "day": "Thu",
+      "cycle": "A1"
+    },
+    {
+      "date": 6,
+      "day": "Fri",
+      "cycle": "B2"
+    },
+    {
+      "date": 9,
+      "day": "Mon",
+      "cycle": "C3"
+    },
+    {
+      "date": 10,
+      "day": "Tue",
+      "cycle": "D4"
+    },
+    {
+      "date": 11,
+      "day": "Wed",
+      "cycle": "A5"
+    },
+    {
+      "date": 12,
+      "day": "Thu",
+      "cycle": "B1"
+    },
+    {
+      "date": 13,
+      "day": "Fri",
+      "cycle": "C2"
+    },
+    {
+      "date": 16,
+      "day": "Mon",
+      "cycle": "HOLIDAY"
+    },
+    {
+      "date": 17,
+      "day": "Tue",
+      "cycle": "HOLIDAY"
+    },
+    {
+      "date": 18,
+      "day": "Wed",
+      "cycle": "D3"
+    },
+    {
+      "date": 19,
+      "day": "Thu",
+      "cycle": "A4"
+    },
+    {
+      "date": 20,
+      "day": "Fri",
+      "cycle": "B5"
+    },
+    {
+      "date": 23,
+      "day": "Mon",
+      "cycle": "C1"
+    },
+    {
+      "date": 24,
+      "day": "Tue",
+      "cycle": "D2"
+    },
+    {
+      "date": 25,
+      "day": "Wed",
+      "cycle": "A3"
+    },
+    {
+      "date": 26,
+      "day": "Thu",
+      "cycle": "B4"
+    },
+    {
+      "date": 27,
+      "day": "Fri",
+      "cycle": "C5"
+    }
+  ],
+  "2026-03": [
+    {
+      "date": 2,
+      "day": "Mon",
+      "cycle": "HOLIDAY"
+    },
+    {
+      "date": 3,
+      "day": "Tue",
+      "cycle": "HOLIDAY"
+    },
+    {
+      "date": 4,
+      "day": "Wed",
+      "cycle": "D1"
+    },
+    {
+      "date": 5,
+      "day": "Thu",
+      "cycle": "A2"
+    },
+    {
+      "date": 6,
+      "day": "Fri",
+      "cycle": "B3"
+    },
+    {
+      "date": 9,
+      "day": "Mon",
+      "cycle": "C4"
+    },
+    {
+      "date": 10,
+      "day": "Tue",
+      "cycle": "D5"
+    },
+    {
+      "date": 11,
+      "day": "Wed",
+      "cycle": "A1"
+    },
+    {
+      "date": 12,
+      "day": "Thu",
+      "cycle": "B2"
+    },
+    {
+      "date": 13,
+      "day": "Fri",
+      "cycle": "C3"
+    },
+    {
+      "date": 16,
+      "day": "Mon",
+      "cycle": "IN-SERVICE"
+    },
+    {
+      "date": 17,
+      "day": "Tue",
+      "cycle": "D4"
+    },
+    {
+      "date": 18,
+      "day": "Wed",
+      "cycle": "A5"
+    },
+    {
+      "date": 19,
+      "day": "Thu",
+      "cycle": "B1"
+    },
+    {
+      "date": 20,
+      "day": "Fri",
+      "cycle": "C2"
+    },
+    {
+      "date": 23,
+      "day": "Mon",
+      "cycle": "D3"
+    },
+    {
+      "date": 24,
+      "day": "Tue",
+      "cycle": "A4"
+    },
+    {
+      "date": 25,
+      "day": "Wed",
+      "cycle": "B5"
+    },
+    {
+      "date": 26,
+      "day": "Thu",
+      "cycle": "C1"
+    },
+    {
+      "date": 27,
+      "day": "Fri",
+      "cycle": "D2"
+    },
+    {
+      "date": 30,
+      "day": "Mon",
+      "cycle": "PTC",
+      "note": "All School PTC (No Students)"
+    },
+    {
+      "date": 31,
+      "day": "Tue",
+      "cycle": "A3",
+      "note": "Half Day/PTC"
+    }
+  ],
+  "2026-04": [
+    {
+      "date": 1,
+      "day": "Wed",
+      "cycle": "B4"
+    },
+    {
+      "date": 2,
+      "day": "Thu",
+      "cycle": "C5"
+    },
+    {
+      "date": 3,
+      "day": "Fri",
+      "cycle": "D1"
+    },
+    {
+      "date": 6,
+      "day": "Mon",
+      "cycle": "HOLIDAY",
+      "note": "Chakri Day"
+    },
+    {
+      "date": 7,
+      "day": "Tue",
+      "cycle": "A2"
+    },
+    {
+      "date": 8,
+      "day": "Wed",
+      "cycle": "B3"
+    },
+    {
+      "date": 9,
+      "day": "Thu",
+      "cycle": "C4"
+    },
+    {
+      "date": 10,
+      "day": "Fri",
+      "cycle": "D5"
+    },
+    {
+      "date": 13,
+      "day": "Mon",
+      "cycle": "SONGKRAN"
+    },
+    {
+      "date": 14,
+      "day": "Tue",
+      "cycle": "SONGKRAN"
+    },
+    {
+      "date": 15,
+      "day": "Wed",
+      "cycle": "SONGKRAN"
+    },
+    {
+      "date": 16,
+      "day": "Thu",
+      "cycle": "SONGKRAN"
+    },
+    {
+      "date": 17,
+      "day": "Fri",
+      "cycle": "SONGKRAN"
+    },
+    {
+      "date": 20,
+      "day": "Mon",
+      "cycle": "A1",
+      "note": "School Resumes"
+    },
+    {
+      "date": 21,
+      "day": "Tue",
+      "cycle": "B2"
+    },
+    {
+      "date": 22,
+      "day": "Wed",
+      "cycle": "C3"
+    },
+    {
+      "date": 23,
+      "day": "Thu",
+      "cycle": "D4"
+    },
+    {
+      "date": 24,
+      "day": "Fri",
+      "cycle": "A5"
+    },
+    {
+      "date": 27,
+      "day": "Mon",
+      "cycle": "B1"
+    },
+    {
+      "date": 28,
+      "day": "Tue",
+      "cycle": "C2"
+    },
+    {
+      "date": 29,
+      "day": "Wed",
+      "cycle": "D3"
+    },
+    {
+      "date": 30,
+      "day": "Thu",
+      "cycle": "A4"
+    }
+  ],
+  "2026-05": [
+    {
+      "date": 1,
+      "day": "Fri",
+      "cycle": "HOLIDAY",
+      "note": "Labor Day/Visakha Bucha"
+    },
+    {
+      "date": 4,
+      "day": "Mon",
+      "cycle": "HOLIDAY",
+      "note": "Coronation Day"
+    },
+    {
+      "date": 5,
+      "day": "Tue",
+      "cycle": "C1"
+    },
+    {
+      "date": 6,
+      "day": "Wed",
+      "cycle": "D2"
+    },
+    {
+      "date": 7,
+      "day": "Thu",
+      "cycle": "A3"
+    },
+    {
+      "date": 8,
+      "day": "Fri",
+      "cycle": "B4"
+    },
+    {
+      "date": 11,
+      "day": "Mon",
+      "cycle": "A3"
+    },
+    {
+      "date": 12,
+      "day": "Tue",
+      "cycle": "B4"
+    },
+    {
+      "date": 13,
+      "day": "Wed",
+      "cycle": "C5"
+    },
+    {
+      "date": 14,
+      "day": "Thu",
+      "cycle": "D1"
+    },
+    {
+      "date": 15,
+      "day": "Fri",
+      "cycle": "A2"
+    },
+    {
+      "date": 18,
+      "day": "Mon",
+      "cycle": "B3"
+    },
+    {
+      "date": 19,
+      "day": "Tue",
+      "cycle": "C4"
+    },
+    {
+      "date": 20,
+      "day": "Wed",
+      "cycle": "D5"
+    },
+    {
+      "date": 21,
+      "day": "Thu",
+      "cycle": "A1"
+    },
+    {
+      "date": 22,
+      "day": "Fri",
+      "cycle": "B2"
+    },
+    {
+      "date": 25,
+      "day": "Mon",
+      "cycle": "C3"
+    },
+    {
+      "date": 26,
+      "day": "Tue",
+      "cycle": "D4"
+    },
+    {
+      "date": 27,
+      "day": "Wed",
+      "cycle": "A5"
+    },
+    {
+      "date": 28,
+      "day": "Thu",
+      "cycle": "B1"
+    },
+    {
+      "date": 29,
+      "day": "Fri",
+      "cycle": "C2"
+    }
+  ],
+  "2026-06": [
+    {
+      "date": 1,
+      "day": "Mon",
+      "cycle": "D3"
+    },
+    {
+      "date": 2,
+      "day": "Tue",
+      "cycle": "A4"
+    },
+    {
+      "date": 3,
+      "day": "Wed",
+      "cycle": "HOLIDAY"
+    },
+    {
+      "date": 4,
+      "day": "Thu",
+      "cycle": "B5"
+    },
+    {
+      "date": 5,
+      "day": "Fri",
+      "cycle": "C1"
+    },
+    {
+      "date": 8,
+      "day": "Mon",
+      "cycle": "D2"
+    },
+    {
+      "date": 9,
+      "day": "Tue",
+      "cycle": "A3"
+    },
+    {
+      "date": 10,
+      "day": "Wed",
+      "cycle": "B4"
+    },
+    {
+      "date": 11,
+      "day": "Thu",
+      "cycle": "C5"
+    },
+    {
+      "date": 12,
+      "day": "Fri",
+      "cycle": "D1",
+      "note": "Last day"
+    }
+  ]
+}

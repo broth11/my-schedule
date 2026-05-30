@@ -1,0 +1,2291 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teacher Schedule Planner</title>
+    <style>
+              @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Work+Sans:wght@300;400;600&display=swap');
+              @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css');
+
+              :root {
+                  --bg-primary: #fafafa;
+                  --bg-secondary: #ffffff;
+                  --text-primary: #1a1a1a;
+                  --text-secondary: #666666;
+                  --border-color: #e0e0e0;
+                  --accent: #2563eb;
+                  --accent-hover: #1d4ed8;
+                  --teaching-color: #10b981;
+                  --free-color: #e5e7eb;
+                  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+                  --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+              }
+
+              [data-theme="dark"] {
+                  --bg-primary: #111827;
+                  --bg-secondary: #1f2937;
+                  --text-primary: #f9fafb;
+                  --text-secondary: #9ca3af;
+                  --border-color: #374151;
+                  --accent: #3b82f6;
+                  --accent-hover: #60a5fa;
+                  --teaching-color: #34d399;
+                  --free-color: #374151;
+                  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+                  --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
+              }
+
+              * {
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+              }
+
+              body {
+                    font-family: 'Roboto', system-ui, sans-serif;                  
+                    background: var(--bg-primary);
+                    color: var(--text-primary);
+                    line-height: 1.6;
+                    transition: background 0.3s ease, color 0.3s ease;
+              }
+
+              html {
+          font-size: clamp(17px, 1.1vw, 18px);
+      }
+
+
+              .container {
+                  max-width: 1300px;
+                  margin: 0 auto;
+                  padding: 2rem;
+              }
+
+              header {
+                  text-align: center;
+                  margin-bottom: 3rem;
+                  padding-bottom: 2rem;
+                  border-bottom: 2px solid var(--border-color);
+              }
+
+              h1 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+
+              .subtitle {
+                  color: var(--text-secondary);
+                  font-size: 1.1rem;
+                  font-weight: 300;
+              }
+
+              /* Controls Section */
+              .controls {
+                  background: var(--bg-secondary);
+                  border-radius: 12px;
+                  padding: 2rem;
+                  margin-bottom: 2rem;
+                  box-shadow: var(--shadow);
+              }
+
+              .control-group {
+                  margin-bottom: 1.5rem;
+              }
+
+              .control-group:last-child {
+                  margin-bottom: 0;
+              }
+
+              .control-label {
+                  font-family: 'Space Mono', monospace;
+                  font-weight: 700;
+                  font-size: 0.84rem;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                  margin-bottom: 1rem;
+                  display: block;
+                  color: var(--text-primary);
+              }
+
+              /* Class Selection Grid */
+              .class-grid {
+                  display: grid;
+                  grid-template-columns: repeat(7, 1fr);
+                  gap: 0.4rem;
+                  margin-bottom: 1rem;
+              }
+
+              .class-checkbox {
+                  position: relative;
+              }
+
+              .class-checkbox input[type="checkbox"] {
+                  position: absolute;
+                  opacity: 0;
+                  width: 100%;
+                  height: 100%;
+                  cursor: pointer;
+                  z-index: 2;
+              }
+
+              .class-label {
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  padding: 0.75rem 0.5rem;
+                  border: 2px solid var(--border-color);
+                  border-radius: 8px;
+                  font-family: 'Space Mono', monospace;
+                  font-weight: 700;
+                  font-size: 0.74rem;
+                  transition: all 0.2s ease;
+                  background: var(--bg-primary);
+                  cursor: pointer;
+                  user-select: none;
+                  min-height: 52px;
+                  height: 52px;
+                  white-space: nowrap;
+              }
+
+              .class-checkbox input[type="checkbox"]:checked + .class-label {
+                  background: var(--accent);
+                  color: white;
+                  border-color: var(--accent);
+                  /* Removed transform: scale(1.05) to prevent overlap */
+              }
+
+              .class-checkbox input[type="checkbox"]:hover + .class-label {
+                  border-color: var(--accent);
+                  /* Removed transform to prevent overlap */
+              }
+
+              /* Button Groups */
+              .button-group {
+                  display: flex;
+                  gap: 1rem;
+                  flex-wrap: wrap;
+              }
+
+              button {
+                  padding: 0.75rem 1.3rem;
+                  border: 2px solid var(--border-color);
+                  border-radius: 8px;
+                  background: var(--bg-secondary);
+                  color: var(--text-primary);
+                  font-family: 'Work Sans', sans-serif;
+                  font-weight: 600;
+                  font-size: 0.95rem;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+              }
+
+              button:hover {
+                  border-color: var(--accent);
+                  background: var(--accent);
+                  color: white;
+                  transform: translateY(-2px);
+              }
+
+              button.active {
+                  background: var(--accent);
+                  color: white;
+                  border-color: var(--accent);
+              }
+
+              /* Color Picker */
+              .color-picker-group {
+                  display: flex;
+                  gap: 1rem;
+                  align-items: center;
+              }
+
+              .color-input-wrapper {
+                  display: flex;
+                  align-items: center;
+                  gap: 0.5rem;
+              }
+
+
+              .color-control {
+                  background: var(--bg-primary);
+                  border: 1px solid var(--border-color);
+                  border-radius: 10px;
+                  padding: 0.65rem;
+              }
+
+              .color-swatch-grid {
+                  display: grid;
+                  grid-template-columns: repeat(10, minmax(0, 1fr));
+                  gap: 0.45rem;
+                  margin-bottom: 0.55rem;
+              }
+
+              .color-swatch {
+                  width: 100%;
+                  height: 28px;
+                  min-width: 0;
+                  border: 2px solid transparent;
+                  border-radius: 7px;
+                  cursor: pointer;
+                  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+              }
+
+              .color-swatch:hover {
+                  transform: translateY(-1px);
+              }
+
+              .color-swatch.active {
+                  border-color: var(--text-primary);
+                  box-shadow: 0 0 0 2px var(--bg-secondary);
+              }
+
+              
+              .color-hex-row {
+                  display: grid;
+                  grid-template-columns: auto 1fr;
+                  align-items: center;
+                  gap: 0.6rem;
+                  width: 100%;
+                  padding: 0.45rem 0.7rem;
+                  border: 2px solid var(--border-color);
+                  border-radius: 8px;
+                  background: var(--bg-secondary);
+              }
+
+              .color-hex-label {
+                  font-family: 'Space Mono', monospace;
+                  font-size: 0.78rem;
+                  color: var(--text-secondary);
+                  white-space: nowrap;
+              }
+
+              .color-hex {
+                  width: 100%;
+                  padding: 0;
+                  border: none;
+                  background: transparent;
+                  color: var(--text-primary);
+                  font-family: 'Space Mono', monospace;
+                  font-size: 0.82rem;
+                  text-transform: uppercase;
+                  outline: none;
+              }
+
+
+              /* Calendar Styles */
+              .calendar-view {
+                  background: var(--bg-secondary);
+                  border-radius: 12px;
+                  padding: 2rem;
+                  box-shadow: var(--shadow);
+                  margin-bottom: 2rem;
+              }
+
+              .calendar-header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 2rem;
+                  padding-bottom: 1rem;
+                  border-bottom: 2px solid var(--border-color);
+              }
+
+              .calendar-title {
+                  font-family: 'IBM Plex Mono', monospace;
+                  font-size: 1.8rem;
+                  font-weight: 700;
+              }
+
+              .nav-buttons {
+                  display: flex;
+                  gap: 0.5rem;
+              }
+
+              .nav-buttons button {
+                  padding: 0.5rem 1rem;
+              }
+
+              /* Monthly View */
+              .month-grid {
+                  display: grid;
+                  grid-template-columns: repeat(5, 1fr); /* Mon-Fri only, no weekends */
+                  gap: 1rem;
+              }
+
+              .day-header {
+                  text-align: center;
+                  font-family: 'Space Mono', monospace;
+                  font-weight: 700;
+                  font-size: 0.85rem;
+                  padding: 0.5rem;
+                  color: var(--text-secondary);
+              }
+
+              .day-cell {
+                  border: 1px solid var(--border-color);
+                  border-radius: 8px;
+                  padding: 0.55rem;
+                  min-height: 132px;
+                  background: var(--bg-primary);
+                  transition: all 0.2s ease;
+              }
+
+              .day-cell:hover {
+                  border-color: var(--accent);
+                  transform: translateY(-2px);
+                  box-shadow: var(--shadow);
+              }
+
+              .day-cell.empty {
+                  background: transparent;
+                  border: none;
+                  min-height: 0; /* Remove min-height to avoid blank rows */
+                  height: 0;
+                  padding: 0;
+                  overflow: hidden;
+              }
+
+              .day-cell.empty:hover {
+                  transform: none;
+                  box-shadow: none;
+              }
+
+              .day-cell.current-day {
+                  border: 3px solid var(--accent);
+                  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--accent)08 100%);
+              }
+
+              .day-number {
+                  font-family: 'Space Mono', monospace;
+                  font-weight: 700;
+                  font-size: 1.1rem;
+                  margin-bottom: 0.5rem;
+              }
+
+              .day-cycle {
+                  font-family: 'Space Mono', monospace;
+                  font-size: 0.75rem;
+                  color: var(--text-secondary);
+                  margin-bottom: 0.5rem;
+              }
+
+              /* Compact header - all info in one line */
+              .day-header-compact {
+                  font-family: 'Space Mono', monospace;
+                  font-size: 0.82rem;
+                  margin-bottom: 0.7rem;
+                  font-weight: 600;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+              }
+
+              .day-periods {
+                  display: grid;
+                  grid-template-columns: repeat(7, minmax(0, 1fr));
+                  gap: 0.32rem;
+                  align-items: center;
+              }
+
+              .period-dot {
+                  width: auto;
+                  min-width: 20px;
+                  height: 18px;
+                  border-radius: 10px;
+                  transition: transform 0.2s ease;
+                  flex-shrink: 0;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-family: 'Space Mono', monospace;
+                  font-size: 0.6rem;
+                  font-weight: 700;
+                  padding: 0 0.22rem;
+                  color: white;
+              }
+
+              .day-periods .period-dot {
+                  width: 100%;
+                  min-width: 0;
+                  height: 24px;
+                  padding: 0 0.18rem;
+                  font-size: 0.64rem;
+              }
+
+              .period-dot.free {
+                  color: var(--text-primary);
+              }
+
+              .period-dot:hover {
+                  transform: scale(1.3);
+              }
+
+              .period-dot.teaching {
+                  background: var(--teaching-color);
+              }
+
+              .period-dot.free {
+                  background: var(--free-color);
+              }
+
+              /* Detailed View */
+              .period-list {
+                  display: flex;
+                  flex-direction: column;
+                  gap: 0.25rem;
+                  font-size: 0.75rem;
+                  font-family: 'Space Mono', monospace;
+              }
+
+              .period-item {
+                  display: flex;
+                  align-items: center;
+                  gap: 0.5rem;
+              }
+
+              .period-item .period-dot {
+                  width: 12px;
+                  height: 12px;
+              }
+
+              /* Daily View */
+              .week-view {
+                  display: flex;
+                  flex-direction: column;
+                  gap: 0.5rem;
+              }
+
+              .week-day {
+                  background: var(--bg-primary);
+                  border: 2px solid var(--border-color);
+                  border-radius: 8px;
+                  padding: 0.95rem 1rem;
+                  transition: all 0.2s ease;
+              }
+
+              .week-day:hover {
+                  border-color: var(--accent);
+                  transform: translateX(4px);
+              }
+
+              .week-day.current-day {
+                  border: 3px solid var(--accent);
+                  background: linear-gradient(90deg, var(--bg-primary) 0%, var(--accent)08 100%);
+              }
+
+              .week-day-header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  gap: 0.9rem;
+                  min-height: 42px;
+              }
+
+              .week-day-info {
+                  display: flex;
+                  align-items: center;
+                  gap: 0.75rem;
+                  flex: 1;
+              }
+
+              .week-day-title {
+                  font-family: 'Space Mono', monospace;
+                  font-size: 1.1rem;
+                  font-weight: 700;
+                  white-space: nowrap;
+              }
+
+              .week-day-date {
+                  color: var(--text-secondary);
+                  font-size: 0.9rem;
+              }
+
+              .week-day-cycle {
+                  font-family: 'Space Mono', monospace;
+                  font-size: 0.85rem;
+                  color: var(--text-secondary);
+                  padding: 0.25rem 0.75rem;
+                  background: var(--bg-secondary);
+                  border-radius: 6px;
+                  white-space: nowrap;
+              }
+
+              .week-periods {
+                  display: flex;
+                  gap: 0.28rem;
+                  flex-wrap: nowrap;
+                  justify-content: flex-end;
+                  align-items: center;
+              }
+
+              .week-periods .period-dot {
+                  min-width: 34px;
+                  height: 34px;
+                  padding: 0 0.5rem;
+                  font-size: 0.9rem;
+                  border-radius: 17px;
+              }
+
+              .week-periods .period-dot.long-label {
+                  min-width: 58px;
+                  font-size: 0.76rem;
+                  padding: 0 0.6rem;
+              }
+
+              /* Print Styles */
+              @media print {
+                  body {
+                      background: white;
+                      color: black;
+                  }
+
+                  .controls, .nav-buttons, button {
+                      display: none !important;
+                  }
+
+                  .calendar-view {
+                      box-shadow: none;
+                      page-break-after: always;
+                      padding: 1rem;
+                  }
+
+                  .calendar-header {
+                      margin-bottom: 1rem;
+                  }
+
+                  .day-cell {
+                      page-break-inside: avoid;
+                      min-height: 86px;
+                      padding: 0.4rem;
+                      font-size: 0.85rem;
+                  }
+
+                  .day-number {
+                      font-size: 0.95rem;
+                  }
+
+                  .day-cycle {
+                      font-size: 0.7rem;
+                  }
+
+                  .month-grid {
+                      gap: 0.45rem;
+                  }
+
+                  .week-day {
+                      page-break-inside: avoid;
+                      margin-bottom: 0.2rem;
+                      padding: 0.42rem 0.68rem;
+                      border-width: 1px;
+                  }
+
+                  .week-day-header {
+                      gap: 0.35rem;
+                  }
+
+                  .week-day-title {
+                      font-size: 0.9rem;
+                  }
+
+                  .week-day-cycle {
+                      font-size: 0.75rem;
+                      padding: 0.2rem 0.5rem;
+                  }
+
+                  .week-periods {
+                      gap: 0.18rem;
+                  }
+
+                  .week-periods .period-dot {
+                      min-width: 24px;
+                      height: 22px;
+                      font-size: 0.66rem;
+                      padding: 0 0.28rem;
+                      print-color-adjust: exact;
+                      -webkit-print-color-adjust: exact;
+                  }
+
+                  .week-periods .period-dot.long-label {
+                      min-width: 38px;
+                      font-size: 0.58rem;
+                  }
+
+                  .day-periods .period-dot {
+                      print-color-adjust: exact;
+                      -webkit-print-color-adjust: exact;
+                  }
+
+                  .legend {
+                      margin-top: 1rem;
+                      padding-top: 1rem;
+                  }
+              }
+
+              /* Dynamic page orientation - will be set by JavaScript */
+              @page {
+                  margin: 0.75cm;
+              }
+
+              /* Legend */
+              .legend {
+                  display: flex;
+                  gap: 2rem;
+                  justify-content: center;
+                  margin-top: 2rem;
+                  padding-top: 2rem;
+                  border-top: 1px solid var(--border-color);
+              }
+
+              .legend-item {
+                  display: flex;
+                  align-items: center;
+                  gap: 0.5rem;
+                  font-size: 0.9rem;
+              }
+
+              .legend-dot {
+                  width: auto;
+                  min-width: 32px;
+                  height: 22px;
+                  border-radius: 12px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-family: 'Space Mono', monospace;
+                  font-size: 0.7rem;
+                  font-weight: 700;
+                  padding: 0 0.4rem;
+                  color: white;
+              }
+
+              .legend-dot.free-legend {
+                  color: var(--text-primary);
+              }
+
+
+              .toast {
+                  position: fixed;
+                  right: 1.5rem;
+                  bottom: 1.5rem;
+                  z-index: 2000;
+                  max-width: min(520px, calc(100vw - 3rem));
+                  padding: 0.85rem 1rem;
+                  border-radius: 12px;
+                  background: var(--bg-secondary);
+                  border: 2px solid var(--border-color);
+                  box-shadow: var(--shadow-lg);
+                  color: var(--text-primary);
+                  opacity: 0;
+                  pointer-events: none;
+                  transform: translateY(12px);
+                  transition: opacity 0.25s ease, transform 0.25s ease;
+                  font-size: 0.88rem;
+                  line-height: 1.45;
+              }
+
+              .toast.show {
+                  opacity: 1;
+                  transform: translateY(0);
+              }
+
+              .toast.success {
+                  border-color: var(--teaching-color);
+              }
+
+              .toast.error {
+                  border-color: #ef4444;
+              }
+
+              /* Settings Panel Styles */
+              .settings-toggle {
+                  position: fixed;
+                  top: 2rem;
+                  right: 3rem;
+                  z-index: 1000;
+                  background: transparent important; /* Remove blue circle */
+
+                  color: var(--text-primary);
+                  border: none;
+                  width: 60px; /* Larger */
+                  height: 60px; /* Larger */
+                  font-size: 2rem; /* Bigger icon */
+                  cursor: pointer;
+                  transition: all 0.3s ease;
+              }
+              .settings-toggle {
+          background: transparent !important;
+          border: none;
+          box-shadow: none;
+      }
+
+      .settings-toggle:hover,
+      .settings-toggle:focus,
+      .settings-toggle:active {
+          background: transparent !important;
+          border: none;
+          box-shadow: none;
+          color: var(--text-primary);
+          transform: scale(1.15); /* keep your nice zoom */
+      }
+
+              .settings-toggle:hover {
+                  transform: scale(1.15);
+              }
+
+              .settings-panel {
+                  position: fixed;
+                  top: 0;
+                  right: -600px;
+                  width: 600px;
+                  height: 100vh;
+                  background: var(--bg-primary);
+                  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+                  z-index: 1001;
+                  transition: right 0.3s ease;
+                  overflow-y: auto;
+                  padding: 2rem;
+              }
+
+              .settings-panel.open {
+                  right: 0;
+              }
+
+              .settings-overlay {
+                  position: fixed;
+                  top: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 100%;
+                  background: rgba(0, 0, 0, 0.5);
+                  z-index: 998;
+                  opacity: 0;
+                  pointer-events: none;
+                  transition: opacity 0.3s ease;
+              }
+
+              .settings-overlay.open {
+                  opacity: 1;
+                  pointer-events: auto;
+              }
+
+              .settings-header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 2rem;
+              }
+
+              .settings-header h2 {
+                  font-family: 'Space Mono', monospace;
+                  font-size: 1.5rem;
+                  margin: 0;
+              }
+
+              .close-settings {
+                  background: none;
+                  border: none;
+                  font-size: 2rem;
+                  cursor: pointer;
+                  color: var(--text-primary);
+                  padding: 0;
+                  width: 40px;
+                  height: 40px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  border-radius: 50%;
+                  transition: background 0.2s ease;
+              }
+
+              .close-settings:hover {
+                  background: var(--border-color);
+              }
+
+              .settings-section {
+                  margin-bottom: 1.15rem;
+                  padding-bottom: 1.15rem;
+                  border-bottom: 1px solid var(--border-color);
+              }
+
+              .settings-section:last-child {
+                  border-bottom: none;
+              }
+
+              .settings-section h3 {
+                  font-family: 'Space Mono', monospace;
+                  font-size: 1rem;
+                  margin-bottom: 0.7rem;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+              }
+
+              .compact-grid-two {
+                  display: grid;
+                  grid-template-columns: 1fr 1fr;
+                  gap: 0.6rem;
+                  align-items: end;
+              }
+
+              .compact-stack > * + * {
+                  margin-top: 0.45rem;
+              }
+
+              .compact-label {
+                  font-size: 0.72rem;
+                  display: block;
+                  margin-bottom: 0.2rem;
+              }
+
+              .compact-date-input {
+                  width: 100%;
+                  padding: 0.42rem 0.55rem;
+                  border: 2px solid var(--border-color);
+                  border-radius: 6px;
+                  background: var(--bg-primary);
+                  color: var(--text-primary);
+                  font-size: 0.9rem;
+              }
+
+              /* Hide settings in print/PDF export */
+              @media print {
+                  .settings-toggle,
+                  .settings-panel,
+                  .settings-overlay {
+                      display: none !important;
+                  }
+              }
+    </style>
+  </head>
+  <body>
+    <!-- Settings Toggle Button -->
+    <button class="settings-toggle" onclick="toggleSettings()" title="Menu">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+
+    <!-- Settings Overlay (darkens background) -->
+    <div
+      class="settings-overlay"
+      id="settingsOverlay"
+      onclick="toggleSettings()"
+    ></div>
+
+    <!-- Settings Slide-out Panel -->
+    <div class="settings-panel" id="settingsPanel">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="close-settings" onclick="toggleSettings()">×</button>
+      </div>
+
+      <!-- Select Your Classes -->
+      <div class="settings-section">
+        <h3>Select Your Classes</h3>
+        <div class="class-grid" id="classGrid"></div>
+        <button onclick="exportToPDF()" style="width: 100%; margin-top: 0.85rem;">
+          <i class="fa-solid fa-file-arrow-down"></i> Export PDF
+        </button>
+      </div>
+
+      <!-- Calendar Settings -->
+      <div class="settings-section">
+        <h3>Calendar Settings</h3>
+        <input
+          type="file"
+          id="icsUpload"
+          accept=".ics"
+          multiple
+          style="display: none;"
+          onchange="handleICSUpload(event)"
+        />
+        <input
+          type="file"
+          id="teacherScheduleUpload"
+          accept=".pdf"
+          style="display: none;"
+          onchange="handleTeacherScheduleUpload(event)"
+        />
+        <div class="compact-stack">
+          <button onclick="document.getElementById('icsUpload').click()" style="width: 100%;">
+            <i class="fa-solid fa-calendar-days"></i> Upload ICS Calendar
+          </button>
+          <button onclick="clearImportedCalendar()" style="width: 100%;">
+            <i class="fa-regular fa-trash-can"></i> Clear Calendar
+          </button>
+          <button onclick="document.getElementById('teacherScheduleUpload').click()" style="width: 100%;">
+            <i class="fa-solid fa-file-pdf"></i> Upload Teacher Schedule PDF
+          </button>
+          <button onclick="clearImportedSchedule()" style="width: 100%;">
+            <i class="fa-solid fa-broom"></i> Clear Teacher Blocks
+          </button>
+          <div id="uploadStatus" class="toast" aria-live="polite"></div>
+          <div class="compact-grid-two">
+            <div>
+              <label class="compact-label" for="dateRangeStart">Start</label>
+              <input type="date" id="dateRangeStart" onchange="setDateRange()" class="compact-date-input" />
+            </div>
+            <div>
+              <label class="compact-label" for="dateRangeEnd">End</label>
+              <input type="date" id="dateRangeEnd" onchange="setDateRange()" class="compact-date-input" />
+            </div>
+          </div>
+          <button onclick="clearDateRange()" style="width: 100%; font-size: 0.85rem; padding: 0.5rem 1rem;">
+            Clear Range
+          </button>
+        </div>
+      </div>
+
+      <!-- Display Options -->
+      <div class="settings-section">
+        <h3>Display Settings</h3>
+        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.35rem; font-weight: 600;">
+          Calendar layout
+        </div>
+        <div
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.9rem;"
+        >
+          <button
+            id="monthlyBtn"
+            class="active"
+            onclick="setView('monthly')"
+            style="font-size: 0.85rem; padding: 0.5rem;"
+          >
+            Monthly
+          </button>
+          <button
+            id="weeklyBtn"
+            onclick="setView('weekly')"
+            style="font-size: 0.85rem; padding: 0.5rem;"
+          >
+            Daily
+          </button>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.35rem; font-weight: 600;">
+          Appearance
+        </div>
+        <div
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem;"
+        >
+          <button
+            id="lightModeBtn"
+            onclick="setTheme('light')"
+            style="font-size: 0.85rem; padding: 0.5rem;"
+          >
+            <i class="fa-regular fa-sun"></i> Light Mode
+          </button>
+          <button
+            id="darkModeBtn"
+            onclick="setTheme('dark')"
+            style="font-size: 0.85rem; padding: 0.5rem;"
+          >
+            <i class="fa-regular fa-moon"></i> Dark Mode
+          </button>
+        </div>
+        <div
+          style="display: grid; grid-template-columns: 1fr; gap: 0.6rem;"
+        >
+          <div class="color-control">
+            <label
+              style="font-size: 0.75rem; display: block; margin-bottom: 0.35rem;"
+              >Teaching</label
+            >
+            <div class="color-swatch-grid">
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#ef4444" style="background:#ef4444" onclick="setColorValue('teachingColor','#ef4444')"></button>
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#f97316" style="background:#f97316" onclick="setColorValue('teachingColor','#f97316')"></button>
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#f59e0b" style="background:#f59e0b" onclick="setColorValue('teachingColor','#f59e0b')"></button>
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#eab308" style="background:#eab308" onclick="setColorValue('teachingColor','#eab308')"></button>
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#10b981" style="background:#10b981" onclick="setColorValue('teachingColor','#10b981')"></button>
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#14b8a6" style="background:#14b8a6" onclick="setColorValue('teachingColor','#14b8a6')"></button>
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#06b6d4" style="background:#06b6d4" onclick="setColorValue('teachingColor','#06b6d4')"></button>
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#3b82f6" style="background:#3b82f6" onclick="setColorValue('teachingColor','#3b82f6')"></button>
+              <button type="button" class="color-swatch" data-target="teachingColor" data-color="#6366f1" style="background:#6366f1" onclick="setColorValue('teachingColor','#6366f1')"></button>
+              <button type="button" class="color-swatch color-swatch-custom" data-target="teachingColor" data-custom="true" style="background:#10b981" onclick="setColorValue('teachingColor', document.getElementById('teachingColor').value)"></button>
+            </div>
+            <div class="color-hex-row">
+              <span class="color-hex-label">Custom Hex Color:</span>
+              <input
+                type="text"
+                id="teachingColor"
+                class="color-hex"
+                value="#10b981"
+                spellcheck="false"
+                onchange="syncColorInput('teachingColor')"
+              />
+            </div>
+          </div>
+          <div class="color-control">
+            <label
+              style="font-size: 0.75rem; display: block; margin-bottom: 0.35rem;"
+              >Planning</label
+            >
+            <div class="color-swatch-grid">
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#ef4444" style="background:#ef4444" onclick="setColorValue('freeColor','#ef4444')"></button>
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#f97316" style="background:#f97316" onclick="setColorValue('freeColor','#f97316')"></button>
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#f59e0b" style="background:#f59e0b" onclick="setColorValue('freeColor','#f59e0b')"></button>
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#eab308" style="background:#eab308" onclick="setColorValue('freeColor','#eab308')"></button>
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#10b981" style="background:#10b981" onclick="setColorValue('freeColor','#10b981')"></button>
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#14b8a6" style="background:#14b8a6" onclick="setColorValue('freeColor','#14b8a6')"></button>
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#06b6d4" style="background:#06b6d4" onclick="setColorValue('freeColor','#06b6d4')"></button>
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#3b82f6" style="background:#3b82f6" onclick="setColorValue('freeColor','#3b82f6')"></button>
+              <button type="button" class="color-swatch" data-target="freeColor" data-color="#6366f1" style="background:#6366f1" onclick="setColorValue('freeColor','#6366f1')"></button>
+              <button type="button" class="color-swatch color-swatch-custom" data-target="freeColor" data-custom="true" style="background:#e5e7eb" onclick="setColorValue('freeColor', document.getElementById('freeColor').value)"></button>
+            </div>
+            <div class="color-hex-row">
+              <span class="color-hex-label">Custom Hex Color:</span>
+              <input
+                type="text"
+                id="freeColor"
+                class="color-hex"
+                value="#e5e7eb"
+                spellcheck="false"
+                onchange="syncColorInput('freeColor')"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <header>
+        <h1>Teacher Schedule Planner</h1>
+        <p class="subtitle">RIS Cycle Day Calendar</p>
+      </header>
+
+      <div class="calendar-view" id="calendarView"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
+
+    <script>
+      if (window.pdfjsLib) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      // Toggle settings panel
+      function toggleSettings() {
+          const panel = document.getElementById('settingsPanel');
+          const overlay = document.getElementById('settingsOverlay');
+          panel.classList.toggle('open');
+          overlay.classList.toggle('open');
+      }
+
+      // Calendar data from RIS PDF - UPDATED WITH ACCURATE DATES
+      const calendarData = {
+          "2026-01": [
+              { date: 6, day: "Mon", cycle: "HOLIDAY", note: "School Resumes" },
+              { date: 7, day: "Tue", cycle: "A1" },
+              { date: 8, day: "Wed", cycle: "B2" },
+              { date: 9, day: "Thu", cycle: "C3" },
+              { date: 12, day: "Mon", cycle: "D4" },
+              { date: 13, day: "Tue", cycle: "A5" },
+              { date: 14, day: "Wed", cycle: "B1" },
+              { date: 15, day: "Thu", cycle: "C2" },
+              { date: 16, day: "Fri", cycle: "D3" },
+              { date: 19, day: "Mon", cycle: "A4" },
+              { date: 20, day: "Tue", cycle: "B5" },
+              { date: 21, day: "Wed", cycle: "C1" },
+              { date: 22, day: "Thu", cycle: "D2" },
+              { date: 23, day: "Fri", cycle: "A3" },
+              { date: 26, day: "Mon", cycle: "IN-SERVICE" },
+              { date: 27, day: "Tue", cycle: "B4" },
+              { date: 28, day: "Wed", cycle: "C5" },
+              { date: 29, day: "Thu", cycle: "D1" },
+              { date: 30, day: "Fri", cycle: "A2" }
+          ],
+          "2026-02": [
+              { date: 2, day: "Mon", cycle: "B3" },
+              { date: 3, day: "Tue", cycle: "C4" },
+              { date: 4, day: "Wed", cycle: "D5" },
+              { date: 5, day: "Thu", cycle: "A1" },
+              { date: 6, day: "Fri", cycle: "B2" },
+              { date: 9, day: "Mon", cycle: "C3" },
+              { date: 10, day: "Tue", cycle: "D4" },
+              { date: 11, day: "Wed", cycle: "A5" },
+              { date: 12, day: "Thu", cycle: "B1" },
+              { date: 13, day: "Fri", cycle: "C2" },
+              { date: 16, day: "Mon", cycle: "HOLIDAY" },
+              { date: 17, day: "Tue", cycle: "HOLIDAY" },
+              { date: 18, day: "Wed", cycle: "D3" },
+              { date: 19, day: "Thu", cycle: "A4" },
+              { date: 20, day: "Fri", cycle: "B5" },
+              { date: 23, day: "Mon", cycle: "C1" },
+              { date: 24, day: "Tue", cycle: "D2" },
+              { date: 25, day: "Wed", cycle: "A3" },
+              { date: 26, day: "Thu", cycle: "B4" },
+              { date: 27, day: "Fri", cycle: "C5" }
+          ],
+          "2026-03": [
+              { date: 2, day: "Mon", cycle: "HOLIDAY" },
+              { date: 3, day: "Tue", cycle: "HOLIDAY" },
+              { date: 4, day: "Wed", cycle: "D1" },
+              { date: 5, day: "Thu", cycle: "A2" },
+              { date: 6, day: "Fri", cycle: "B3" },
+              { date: 9, day: "Mon", cycle: "C4" },
+              { date: 10, day: "Tue", cycle: "D5" },
+              { date: 11, day: "Wed", cycle: "A1" },
+              { date: 12, day: "Thu", cycle: "B2" },
+              { date: 13, day: "Fri", cycle: "C3" },
+              { date: 16, day: "Mon", cycle: "IN-SERVICE" },
+              { date: 17, day: "Tue", cycle: "D4" },
+              { date: 18, day: "Wed", cycle: "A5" },
+              { date: 19, day: "Thu", cycle: "B1" },
+              { date: 20, day: "Fri", cycle: "C2" },
+              { date: 23, day: "Mon", cycle: "D3" },
+              { date: 24, day: "Tue", cycle: "A4" },
+              { date: 25, day: "Wed", cycle: "B5" },
+              { date: 26, day: "Thu", cycle: "C1" },
+              { date: 27, day: "Fri", cycle: "D2" },
+              { date: 30, day: "Mon", cycle: "PTC", note: "All School PTC (No Students)" },
+              { date: 31, day: "Tue", cycle: "A3", note: "Half Day/PTC" }
+          ],
+          "2026-04": [
+              { date: 1, day: "Wed", cycle: "B4" },
+              { date: 2, day: "Thu", cycle: "C5" },
+              { date: 3, day: "Fri", cycle: "D1" },
+              { date: 6, day: "Mon", cycle: "HOLIDAY", note: "Chakri Day" },
+              { date: 7, day: "Tue", cycle: "A2" },
+              { date: 8, day: "Wed", cycle: "B3" },
+              { date: 9, day: "Thu", cycle: "C4" },
+              { date: 10, day: "Fri", cycle: "D5" },
+              { date: 13, day: "Mon", cycle: "SONGKRAN" },
+              { date: 14, day: "Tue", cycle: "SONGKRAN" },
+              { date: 15, day: "Wed", cycle: "SONGKRAN" },
+              { date: 16, day: "Thu", cycle: "SONGKRAN" },
+              { date: 17, day: "Fri", cycle: "SONGKRAN" },
+              { date: 20, day: "Mon", cycle: "A1", note: "School Resumes" },
+              { date: 21, day: "Tue", cycle: "B2" },
+              { date: 22, day: "Wed", cycle: "C3" },
+              { date: 23, day: "Thu", cycle: "D4" },
+              { date: 24, day: "Fri", cycle: "A5" },
+              { date: 27, day: "Mon", cycle: "B1" },
+              { date: 28, day: "Tue", cycle: "C2" },
+              { date: 29, day: "Wed", cycle: "D3" },
+              { date: 30, day: "Thu", cycle: "A4" }
+          ],
+          "2026-05": [
+              { date: 1, day: "Fri", cycle: "HOLIDAY", note: "Labor Day/Visakha Bucha" },
+              { date: 4, day: "Mon", cycle: "HOLIDAY", note: "Coronation Day" },
+              { date: 5, day: "Tue", cycle: "C1" },
+              { date: 6, day: "Wed", cycle: "D2" },
+              { date: 7, day: "Thu", cycle: "A3" },
+              { date: 8, day: "Fri", cycle: "B4" },
+              { date: 11, day: "Mon", cycle: "A3" },
+              { date: 12, day: "Tue", cycle: "B4" },
+              { date: 13, day: "Wed", cycle: "C5" },
+              { date: 14, day: "Thu", cycle: "D1" },
+              { date: 15, day: "Fri", cycle: "A2" },
+              { date: 18, day: "Mon", cycle: "B3" },
+              { date: 19, day: "Tue", cycle: "C4" },
+              { date: 20, day: "Wed", cycle: "D5" },
+              { date: 21, day: "Thu", cycle: "A1" },
+              { date: 22, day: "Fri", cycle: "B2" },
+              { date: 25, day: "Mon", cycle: "C3" },
+              { date: 26, day: "Tue", cycle: "D4" },
+              { date: 27, day: "Wed", cycle: "A5" },
+              { date: 28, day: "Thu", cycle: "B1" },
+              { date: 29, day: "Fri", cycle: "C2" }
+          ],
+          "2026-06": [
+              { date: 1, day: "Mon", cycle: "D3" },
+              { date: 2, day: "Tue", cycle: "A4" },
+              { date: 3, day: "Wed", cycle: "HOLIDAY" },
+              { date: 4, day: "Thu", cycle: "B5" },
+              { date: 5, day: "Fri", cycle: "C1" },
+              { date: 8, day: "Mon", cycle: "D2" },
+              { date: 9, day: "Tue", cycle: "A3" },
+              { date: 10, day: "Wed", cycle: "B4" },
+              { date: 11, day: "Thu", cycle: "C5" },
+              { date: 12, day: "Fri", cycle: "D1", note: "Last day" }
+          ]
+      };
+
+      // Default calendar is now empty - user must upload ICS files
+      const defaultCalendarData = calendarData;
+
+      // ICS Calendar Import Functionality
+      let importedCalendarData = {};
+      let useImportedData = false;
+      let scheduleAssignments = {};
+
+      const DAY_LETTERS = ['A', 'B', 'C', 'D'];
+      const DAY_BLOCK_ORDER = ['1', '2', '3', '4', 'FX', 'ELB', '5'];
+      const NON_TEACHING_PATTERNS = [/common planning time/i, /planning time/i];
+
+      function buildBlockCode(day, slot) {
+          return ['HR', 'FX', 'ELB'].includes(slot) ? `${day}-${slot}` : `${day}${slot}`;
+      }
+
+      function getSlotFromCode(code) {
+          if (!code) return '';
+          return code.includes('-') ? code.split('-')[1] : code.slice(1);
+      }
+
+      function getDayLetterFromCycle(cycleCode) {
+          if (!cycleCode || typeof cycleCode !== 'string') return null;
+          const dayLetter = cycleCode.trim().charAt(0).toUpperCase();
+          return DAY_LETTERS.includes(dayLetter) ? dayLetter : null;
+      }
+
+      function formatGridLabel(code) {
+          return code.replace('-ELB', ' ELB');
+      }
+
+      function formatInlinePeriodLabel(code) {
+          return getSlotFromCode(code);
+      }
+
+      function isLongInlineLabel(code) {
+          return false;
+      }
+
+      function sanitizeHexColor(value, fallback) {
+          const raw = (value || '').trim();
+          const cleaned = raw.startsWith('#') ? raw.slice(1) : raw;
+          if (/^[0-9a-fA-F]{6}$/.test(cleaned)) return `#${cleaned.toLowerCase()}`;
+          if (/^[0-9a-fA-F]{3}$/.test(cleaned)) return `#${cleaned.toLowerCase()}`;
+          return fallback;
+      }
+
+      function refreshColorSwatches() {
+          const fixedColors = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1'];
+
+          document.querySelectorAll('.color-swatch').forEach(button => {
+              const target = button.dataset.target;
+              const input = document.getElementById(target);
+              const current = (input?.value || '').toLowerCase();
+
+              if (button.dataset.custom === 'true') {
+                  button.style.background = current;
+                  button.classList.toggle('active', !fixedColors.includes(current));
+              } else {
+                  const color = (button.dataset.color || '').toLowerCase();
+                  button.classList.toggle('active', current === color);
+              }
+          });
+      }
+
+      function setColorValue(inputId, color) {
+          const input = document.getElementById(inputId);
+          if (!input) return;
+          input.value = color;
+          updateColors();
+      }
+
+      function syncColorInput(inputId) {
+          const input = document.getElementById(inputId);
+          if (!input) return;
+          const fallback = inputId === 'teachingColor' ? '#10b981' : '#e5e7eb';
+          input.value = sanitizeHexColor(input.value, fallback);
+          updateColors();
+      }
+
+      function getBlockTooltip(code) {
+          const assignment = scheduleAssignments[code];
+          return assignment ? `${code} • ${assignment}` : code;
+      }
+
+      function expandDaySpec(spec) {
+          const cleaned = (spec || '').replace(/\s+/g, '');
+          const result = new Set();
+
+          cleaned.split(',').forEach(part => {
+              if (!part) return;
+              const rangeMatch = part.match(/^([A-D])-([A-D])$/i);
+              if (rangeMatch) {
+                  const start = DAY_LETTERS.indexOf(rangeMatch[1].toUpperCase());
+                  const end = DAY_LETTERS.indexOf(rangeMatch[2].toUpperCase());
+                  if (start !== -1 && end !== -1) {
+                      const [lo, hi] = start <= end ? [start, end] : [end, start];
+                      for (let i = lo; i <= hi; i++) {
+                          result.add(DAY_LETTERS[i]);
+                      }
+                  }
+                  return;
+              }
+
+              const singleMatch = part.match(/^([A-D])$/i);
+              if (singleMatch) {
+                  result.add(singleMatch[1].toUpperCase());
+              }
+          });
+
+          return Array.from(result);
+      }
+
+      function normalizeTeacherScheduleText(rawText) {
+          return rawText
+              .replace(/[–—−￾－]/g, '-')
+              .replace(/\s+/g, ' ')
+              .trim();
+      }
+
+      function extractCourseName(rowText) {
+          const withoutExpr = rowText.replace(/^(HR|ELB|FX|[1-5])\([^)]+\)\s*/i, '');
+          const withoutTerm = withoutExpr.replace(/^(25-26|S1|S2)\s*/i, '');
+          const withoutCourseCode = withoutTerm.replace(/^[A-Z]+\d+\s+/i, '');
+          const withoutSection = withoutCourseCode.replace(/\s+\d+[A-Z]?\s+H\d+.*$/i, '');
+          return withoutSection.trim();
+      }
+
+      async function extractTextFromPDF(arrayBuffer) {
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          let fullText = '';
+
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              const content = await page.getTextContent();
+              const pageText = content.items.map(item => item.str).join(' ');
+              fullText += ` ${pageText}`;
+          }
+
+          return fullText;
+      }
+
+      function parseTeacherScheduleText(rawText) {
+          const normalized = normalizeTeacherScheduleText(rawText);
+          const expressionRegex = /\b(HR|ELB|FX|[1-5])\(([A-D,\-\s]+)\)/g;
+          const matches = Array.from(normalized.matchAll(expressionRegex));
+
+          if (!matches.length) {
+              throw new Error('No schedule expressions like 3(A,C-D) were found in the PDF.');
+          }
+
+          const selectedCodes = new Set();
+          const assignments = {};
+          let ignoredPlanningBlocks = 0;
+
+          matches.forEach((match, index) => {
+              const slot = match[1].toUpperCase();
+              const daySpec = match[2];
+              const rowStart = match.index;
+              const rowEnd = index < matches.length - 1 ? matches[index + 1].index : normalized.length;
+              const rowText = normalized.slice(rowStart, rowEnd).trim();
+              const courseName = extractCourseName(rowText);
+              const isNonTeaching = NON_TEACHING_PATTERNS.some(pattern => pattern.test(rowText));
+              const days = expandDaySpec(daySpec);
+
+              days.forEach(day => {
+                  const code = buildBlockCode(day, slot);
+                  if (!isNonTeaching) {
+                      selectedCodes.add(code);
+                      if (courseName) {
+                          assignments[code] = courseName;
+                      }
+                  } else {
+                      ignoredPlanningBlocks += 1;
+                  }
+              });
+          });
+
+          return {
+              selectedCodes: Array.from(selectedCodes),
+              assignments,
+              ignoredPlanningBlocks,
+              expressionCount: matches.length
+          };
+      }
+
+      async function handleTeacherScheduleUpload(event) {
+          const file = event.target.files?.[0];
+          if (!file) return;
+
+          showToast(`<i class="fa-solid fa-spinner fa-spin"></i> Processing teacher schedule: ${file.name}`, 'success');
+
+          try {
+              const arrayBuffer = await file.arrayBuffer();
+              const rawText = await extractTextFromPDF(arrayBuffer);
+              const parsed = parseTeacherScheduleText(rawText);
+
+              selectedClasses = new Set(parsed.selectedCodes);
+              scheduleAssignments = parsed.assignments;
+              saveSettings();
+              createClassGrid();
+              updateCalendar();
+
+              const planningNote = parsed.ignoredPlanningBlocks
+                  ? ` Ignored ${parsed.ignoredPlanningBlocks} planning block${parsed.ignoredPlanningBlocks === 1 ? '' : 's'}.`
+                  : '';
+              showToast(`<i class="fa-regular fa-circle-check"></i> Imported ${parsed.selectedCodes.length} scheduled block obligations from ${parsed.expressionCount} PDF expressions.${planningNote}`, 'success');
+          } catch (error) {
+              console.error('Error parsing teacher schedule PDF:', error);
+              showToast(`<i class="fa-regular fa-circle-xmark"></i> Teacher schedule import failed: ${error.message}`, 'error');
+          }
+
+          event.target.value = '';
+      }
+
+      function clearImportedSchedule() {
+          selectedClasses = new Set();
+          scheduleAssignments = {};
+          saveSettings();
+          createClassGrid();
+          updateCalendar();
+
+          const statusDiv = document.getElementById('uploadStatus');
+          statusDiv.innerHTML = '<i class="fa-regular fa-circle-check"></i> Cleared imported schedule blocks';
+          statusDiv.style.color = 'var(--teaching-color)';
+
+          setTimeout(() => {
+              statusDiv.textContent = '';
+              statusDiv.style.color = 'var(--text-secondary)';
+          }, 3000);
+      }
+
+      // Handle ICS file upload (supports multiple files)
+      let toastTimeout = null;
+
+      function showToast(message, type = 'success') {
+          const toast = document.getElementById('uploadStatus');
+          if (!toast) return;
+          toast.className = `toast ${type}`;
+          toast.innerHTML = message;
+          requestAnimationFrame(() => toast.classList.add('show'));
+
+          if (toastTimeout) clearTimeout(toastTimeout);
+          toastTimeout = setTimeout(() => {
+              toast.classList.remove('show');
+          }, 3600);
+      }
+
+      function mergeCalendarDataObjects(baseData, incomingData) {
+          const mergedMap = new Map();
+
+          function pushDay(monthKey, dayObj) {
+              const dayKey = `${monthKey}-${String(dayObj.date).padStart(2, '0')}`;
+              if (!mergedMap.has(dayKey)) {
+                  mergedMap.set(dayKey, { ...dayObj });
+                  return;
+              }
+
+              const existing = mergedMap.get(dayKey);
+              const notes = [existing.note, dayObj.note].filter(Boolean).join('; ');
+              mergedMap.set(dayKey, {
+                  ...existing,
+                  ...dayObj,
+                  cycle: dayObj.cycle || existing.cycle,
+                  note: notes || undefined
+              });
+          }
+
+          [baseData || {}, incomingData || {}].forEach(source => {
+              Object.entries(source).forEach(([monthKey, days]) => {
+                  days.forEach(dayObj => pushDay(monthKey, dayObj));
+              });
+          });
+
+          const result = {};
+          Array.from(mergedMap.entries())
+              .sort(([a], [b]) => a.localeCompare(b))
+              .forEach(([dayKey, dayObj]) => {
+                  const monthKey = dayKey.slice(0, 7);
+                  if (!result[monthKey]) result[monthKey] = [];
+                  result[monthKey].push(dayObj);
+              });
+
+          Object.keys(result).forEach(monthKey => {
+              result[monthKey].sort((a, b) => a.date - b.date);
+          });
+
+          return result;
+      }
+
+      async function handleICSUpload(event) {
+          const files = event.target.files;
+          if (!files || files.length === 0) return;
+
+          showToast(`<i class="fa-solid fa-spinner fa-spin"></i> Processing ${files.length} calendar file${files.length === 1 ? '' : 's'}...`, 'success');
+
+          try {
+              // Parse all ICS files and merge
+              const allEvents = [];
+
+              for (let file of files) {
+                  const text = await file.text();
+                  const events = parseICS(text);
+                  allEvents.push(...events);
+                  console.log(`Parsed ${events.length} events from ${file.name}`);
+              }
+
+              // Merge all events by date, preserving any previously imported calendars
+              const newCalendarData = mergeEventsIntoCalendar(allEvents);
+              importedCalendarData = mergeCalendarDataObjects(
+                  useImportedData ? importedCalendarData : {},
+                  newCalendarData
+              );
+
+              // Save to localStorage
+              localStorage.setItem('importedCalendar', JSON.stringify(importedCalendarData));
+              useImportedData = true;
+              localStorage.setItem('useImportedData', 'true');
+
+              // Reset to first available month in the imported data
+              const availableMonths = Object.keys(getFilteredCalendarData()).sort();
+              if (availableMonths.length > 0) {
+                  currentMonth = availableMonths[0];
+              }
+
+              // Update the calendar display
+              updateCalendar();
+
+              showToast(`<i class="fa-regular fa-circle-check"></i> Imported ${allEvents.length} calendar event${allEvents.length === 1 ? '' : 's'} from ${files.length} ICS file${files.length === 1 ? '' : 's'}.`, 'success');
+
+          } catch (error) {
+              console.error('Error parsing ICS:', error);
+              showToast(`<i class="fa-regular fa-circle-xmark"></i> Calendar import failed: ${error.message}`, 'error');
+          }
+
+          // Reset file input
+          event.target.value = '';
+      }
+
+      // Parse ICS file and extract events
+      function parseICS(icsText) {
+          const jcalData = ICAL.parse(icsText);
+          const comp = new ICAL.Component(jcalData);
+          const vevents = comp.getAllSubcomponents('vevent');
+
+          const events = [];
+
+          vevents.forEach(vevent => {
+              const event = new ICAL.Event(vevent);
+              const summary = event.summary || '';
+              const startDate = event.startDate;
+              const endDate = event.endDate;
+
+              if (!startDate) return;
+
+              // For multi-day events, create an entry for each day
+              const start = new Date(startDate.year, startDate.month - 1, startDate.day);
+
+              // If there's an end date and it's different from start, expand the event
+              if (endDate) {
+                  const end = new Date(endDate.year, endDate.month - 1, endDate.day);
+
+                  // For all-day events, end date is exclusive (event ends at midnight before end date)
+                  // So we subtract one day from the end
+                  end.setDate(end.getDate() - 1);
+
+                  // Create event for each day in the range
+                  const currentDate = new Date(start);
+                  while (currentDate <= end) {
+                      const year = currentDate.getFullYear();
+                      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                      const day = String(currentDate.getDate()).padStart(2, '0');
+                      const dateKey = `${year}-${month}-${day}`;
+
+                      events.push({
+                          date: dateKey,
+                          summary: summary,
+                          description: event.description || ''
+                      });
+
+                      currentDate.setDate(currentDate.getDate() + 1);
+                  }
+              } else {
+                  // Single day event
+                  const year = startDate.year;
+                  const month = String(startDate.month).padStart(2, '0');
+                  const day = String(startDate.day).padStart(2, '0');
+                  const dateKey = `${year}-${month}-${day}`;
+
+                  events.push({
+                      date: dateKey,
+                      summary: summary,
+                      description: event.description || ''
+                  });
+              }
+          });
+
+          return events;
+      }
+
+      // Merge events into calendar structure
+      function mergeEventsIntoCalendar(events) {
+          const merged = {};
+
+          // Group events by date
+          const eventsByDate = {};
+          events.forEach(event => {
+              if (!eventsByDate[event.date]) {
+                  eventsByDate[event.date] = [];
+              }
+              eventsByDate[event.date].push(event);
+          });
+
+          // Process each date
+          Object.keys(eventsByDate).forEach(dateKey => {
+              const [year, month, day] = dateKey.split('-');
+              const monthKey = `${year}-${month}`;
+
+              if (!merged[monthKey]) {
+                  merged[monthKey] = [];
+              }
+
+              const dateEvents = eventsByDate[dateKey];
+
+              // Extract cycle code from events
+              let cycleCode = null;
+              let notes = [];
+
+              dateEvents.forEach(event => {
+                  const summary = event.summary;
+
+                  // Look for cycle day pattern (Day A-1, Day B-2, etc.)
+                  const cycleMatch = summary.match(/Day\s+([A-D])-?([1-5])/i);
+                  if (cycleMatch) {
+                      cycleCode = `${cycleMatch[1]}${cycleMatch[2]}`;
+                  }
+
+                  // Check for special day types
+                  if (summary.match(/holiday|break/i) && !cycleCode) {
+                      cycleCode = 'HOLIDAY';
+                  } else if (summary.match(/in-service/i) && !cycleCode) {
+                      cycleCode = 'IN-SERVICE';
+                  } else if (summary.match(/songkran/i) && !cycleCode) {
+                      cycleCode = 'SONGKRAN';
+                  } else if (summary.match(/PTC/i) && summary.match(/no.*student/i)) {
+                      cycleCode = 'PTC';
+                  }
+
+                  // Collect all non-cycle-day events as notes
+                  if (!summary.match(/Day\s+[A-D]-?[1-5]/i)) {
+                      notes.push(summary);
+                  }
+              });
+
+              // Create the day object
+              const dayOfWeek = new Date(dateKey).toLocaleDateString('en-US', { weekday: 'short' });
+              const dayObj = {
+                  date: parseInt(day),
+                  day: dayOfWeek.substring(0, 3),
+                  cycle: cycleCode
+              };
+
+              if (notes.length > 0) {
+                  dayObj.note = notes.join('; ');
+              }
+
+              merged[monthKey].push(dayObj);
+          });
+
+          // Sort each month by date
+          Object.keys(merged).forEach(monthKey => {
+              merged[monthKey].sort((a, b) => a.date - b.date);
+          });
+
+          return merged;
+      }
+
+      // Clear imported calendar data
+      function clearImportedCalendar() {
+          if (confirm('Clear all imported calendar data and return to default calendar?')) {
+              importedCalendarData = {};
+              useImportedData = false;
+              localStorage.removeItem('importedCalendar');
+              localStorage.removeItem('useImportedData');
+
+              const statusDiv = document.getElementById('uploadStatus');
+              statusDiv.innerHTML = '<i class="fa-regular fa-circle-check"></i> Cleared imported data';
+              statusDiv.style.color = 'var(--teaching-color)';
+
+              // Reset to first available month after clearing
+              const availableMonths = Object.keys(getFilteredCalendarData()).sort();
+              if (availableMonths.length > 0) {
+                  currentMonth = availableMonths[0];
+              }
+
+              updateCalendar();
+
+              setTimeout(() => {
+                  statusDiv.textContent = '';
+              }, 3000);
+          }
+      }
+
+      // Get active calendar data (imported or default)
+      function getActiveCalendarData() {
+          if (useImportedData && Object.keys(importedCalendarData).length > 0) {
+              return importedCalendarData;
+          }
+          return defaultCalendarData; // Empty until user uploads ICS
+      }
+
+      // Date range filtering
+      let dateRangeStart = null;
+      let dateRangeEnd = null;
+
+      function setDateRange() {
+          const startInput = document.getElementById('dateRangeStart').value;
+          const endInput = document.getElementById('dateRangeEnd').value;
+
+          if (startInput) {
+              // Convert YYYY-MM-DD to YYYY-MM for month comparison
+              dateRangeStart = startInput.substring(0, 7);
+          } else {
+              dateRangeStart = null;
+          }
+
+          if (endInput) {
+              dateRangeEnd = endInput.substring(0, 7);
+          } else {
+              dateRangeEnd = null;
+          }
+
+          // Save to localStorage
+          localStorage.setItem('dateRangeStart', startInput || '');
+          localStorage.setItem('dateRangeEnd', endInput || '');
+
+          // Reset to first available month in the new range
+          const availableMonths = Object.keys(getFilteredCalendarData()).sort();
+          if (availableMonths.length > 0) {
+              currentMonth = availableMonths[0];
+          }
+
+          updateCalendar();
+      }
+
+      function clearDateRange() {
+          dateRangeStart = null;
+          dateRangeEnd = null;
+          document.getElementById('dateRangeStart').value = '';
+          document.getElementById('dateRangeEnd').value = '';
+          localStorage.removeItem('dateRangeStart');
+          localStorage.removeItem('dateRangeEnd');
+
+          // Reset to first available month after clearing range
+          const availableMonths = Object.keys(getFilteredCalendarData()).sort();
+          if (availableMonths.length > 0) {
+              currentMonth = availableMonths[0];
+          }
+
+          updateCalendar();
+      }
+
+      function getFilteredCalendarData() {
+          const data = getActiveCalendarData();
+
+          if (!dateRangeStart && !dateRangeEnd) {
+              return data;
+          }
+
+          const filtered = {};
+
+          // Get all month keys and sort them chronologically
+          const sortedMonths = Object.keys(data).sort();
+
+          sortedMonths.forEach(monthKey => {
+              // Check if this month is within range
+              if (dateRangeStart && monthKey < dateRangeStart) {
+                  return; // Skip months before start
+              }
+              if (dateRangeEnd && monthKey > dateRangeEnd) {
+                  return; // Skip months after end
+              }
+
+              filtered[monthKey] = data[monthKey];
+          });
+
+          return filtered;
+      }
+
+      // State
+      let selectedClasses = new Set();
+      let currentView = 'monthly';
+      let currentMonth = '2026-01';
+      let currentWeekStart = null;
+
+      // Initialize
+      document.addEventListener('DOMContentLoaded', () => {
+          loadSettings();
+          createClassGrid();
+          refreshColorSwatches();
+          document.body.className = 'view-monthly'; // Set initial view class
+          updatePrintOrientation(); // Set initial print orientation
+
+          // Set currentMonth to first available month in filtered data
+          const availableMonths = Object.keys(getFilteredCalendarData()).sort();
+          if (availableMonths.length > 0) {
+              currentMonth = availableMonths[0];
+          }
+
+          // Open settings panel by default on page load
+          const panel = document.getElementById('settingsPanel');
+          const overlay = document.getElementById('settingsOverlay');
+          panel.classList.add('open');
+          overlay.classList.add('open');
+
+          updateCalendar();
+      });
+
+      // Create class selection grid
+      function createClassGrid() {
+          const grid = document.getElementById('classGrid');
+          grid.innerHTML = '';
+
+          DAY_LETTERS.forEach(letter => {
+              DAY_BLOCK_ORDER.forEach(slot => {
+                  const code = buildBlockCode(letter, slot);
+                  const div = document.createElement('div');
+                  div.className = 'class-checkbox';
+                  div.innerHTML = `
+                      <input type="checkbox" id="class-${code}" value="${code}"
+                             ${selectedClasses.has(code) ? 'checked' : ''}
+                             onchange="toggleClass('${code}')">
+                      <label for="class-${code}" class="class-label" title="${code}">${formatGridLabel(code)}</label>
+                  `;
+                  grid.appendChild(div);
+              });
+          });
+      }
+
+      // Toggle class selection
+      function toggleClass(code) {
+          if (selectedClasses.has(code)) {
+              selectedClasses.delete(code);
+          } else {
+              selectedClasses.add(code);
+          }
+          saveSettings();
+          updateCalendar();
+      }
+
+      // Get block units for a cycle day
+      function getPeriodsForDay(cycleCode) {
+          const letter = getDayLetterFromCycle(cycleCode);
+          if (!letter) return [];
+          return DAY_BLOCK_ORDER.map(slot => buildBlockCode(letter, slot));
+      }
+
+      // Update calendar view
+      function updateCalendar() {
+          const calendarView = document.getElementById('calendarView');
+          const filteredData = getFilteredCalendarData();
+
+          // Check if calendar is empty
+          if (Object.keys(filteredData).length === 0) {
+              calendarView.innerHTML = `
+                  <div style="background: var(--bg-secondary); border-radius: 12px; padding: 3rem; text-align: center; box-shadow: var(--shadow);">
+                      <h2 style="font-size: 2rem; margin-bottom: 1rem;"><i class="fa-solid fa-calendar-xmark"></i> No Calendar Data</h2>
+                      <p style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                          Upload your ICS calendar files or use the built-in calendar to get started!
+                      </p>
+                      <button onclick="document.getElementById('icsUpload').click()" style="padding: 1rem 2rem; font-size: 1.1rem;">
+                          <i class="fa-solid fa-calendar-days"></i> Upload ICS Calendar
+                      </button>
+                      <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 1.5rem;">
+                          Export your Google Calendar as ICS files, then upload them here.<br>
+                          Upload your teacher schedule PDF to auto-fill the teaching blocks.
+                      </p>
+                  </div>
+              `;
+              return;
+          }
+
+          if (currentView === 'monthly') {
+              calendarView.innerHTML = renderMonthlyView();
+          } else {
+              calendarView.innerHTML = renderWeeklyView();
+          }
+      }
+
+      // Render monthly view
+      function renderMonthlyView() {
+          const [year, month] = currentMonth.split('-');
+          const monthName = new Date(year, parseInt(month) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          const days = getFilteredCalendarData()[currentMonth] || [];
+          const today = new Date();
+
+          // Get first day of month to calculate offset (0=Sun, 1=Mon, ... 6=Sat)
+          const firstDay = new Date(year, parseInt(month) - 1, 1).getDay();
+          const daysInMonth = new Date(year, parseInt(month), 0).getDate();
+
+          let html = `
+              <div class="calendar-header">
+                  <h2 class="calendar-title">${monthName}</h2>
+                  <div class="nav-buttons">
+                      <button onclick="prevMonth()">← Previous</button>
+                      <button onclick="nextMonth()">Next →</button>
+                  </div>
+              </div>
+              <div class="month-grid">
+                  <div class="day-header">Mon</div>
+                  <div class="day-header">Tue</div>
+                  <div class="day-header">Wed</div>
+                  <div class="day-header">Thu</div>
+                  <div class="day-header">Fri</div>
+          `;
+
+          // Add empty cells for offset (adjust for Mon-Fri only: 0=Mon, Sat/Sun get skipped)
+          const adjustedFirstDay = firstDay === 0 ? 5 : (firstDay === 6 ? 5 : firstDay - 1); // Sun=5, Sat=5, Mon=0, etc.
+
+          // Only add offset cells if not starting on Monday
+          if (adjustedFirstDay > 0 && adjustedFirstDay < 5) {
+              for (let i = 0; i < adjustedFirstDay; i++) {
+                  html += '<div class="day-cell empty"></div>';
+              }
+          }
+
+          // Add day cells (skip Saturdays and Sundays)
+          const dayMap = {};
+          days.forEach(d => { dayMap[d.date] = d; });
+
+          for (let date = 1; date <= daysInMonth; date++) {
+              // Check if this date is a Saturday or Sunday
+              const currentDate = new Date(year, parseInt(month) - 1, date);
+              const dayOfWeek = currentDate.getDay();
+
+              // Skip Saturdays (6) and Sundays (0)
+              if (dayOfWeek === 0 || dayOfWeek === 6) {
+                  continue;
+              }
+
+              const dayData = dayMap[date];
+              const isToday = today.getFullYear() == year &&
+                             today.getMonth() + 1 == parseInt(month) &&
+                             today.getDate() == date;
+
+              if (!dayData) {
+                  html += `<div class="day-cell">
+                      <div class="day-header-compact">${date}</div>
+                  </div>`;
+              } else {
+                  const cycleClass = isToday ? 'day-cell current-day' : 'day-cell';
+                  html += `<div class="${cycleClass}">
+                      <div class="day-header-compact">${date} • ${dayData.day} - ${dayData.cycle || 'No class'}</div>
+                      ${renderPeriods(dayData.cycle)}
+                      ${dayData.note ? `<div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.5rem;">${dayData.note}</div>` : ''}
+                  </div>`;
+              }
+          }
+
+          html += `</div>`;
+
+          return html;
+      }
+
+      // Render daily view
+      function renderWeeklyView() {
+          const days = getFilteredCalendarData()[currentMonth] || [];
+          const [year, month] = currentMonth.split('-');
+          const monthName = new Date(year, parseInt(month) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          const today = new Date();
+          const daysInMonth = new Date(year, parseInt(month), 0).getDate();
+
+          let html = `
+              <div class="calendar-header">
+                  <h2 class="calendar-title">${monthName} - Daily View</h2>
+                  <div class="nav-buttons">
+                      <button onclick="prevMonth()">← Previous Month</button>
+                      <button onclick="nextMonth()">Next Month →</button>
+                  </div>
+              </div>
+              <div class="week-view">
+          `;
+
+          // Create a map of days by date number
+          const dayMap = {};
+          days.forEach(d => { dayMap[d.date] = d; });
+
+          // Loop through ALL days of the month (including weekends)
+          for (let date = 1; date <= daysInMonth; date++) {
+              const currentDate = new Date(year, parseInt(month) - 1, date);
+              const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+              const dayData = dayMap[date];
+
+              const isToday = today.getFullYear() == year &&
+                             today.getMonth() + 1 == parseInt(month) &&
+                             today.getDate() == date;
+
+              const dayClass = isToday ? 'week-day current-day' : 'week-day';
+
+              if (dayData) {
+                  // Day has data
+                  const periodsHTML = renderPeriodsInline(dayData.cycle);
+
+                  html += `
+                      <div class="${dayClass}">
+                          <div class="week-day-header">
+                              <div class="week-day-info">
+                                  <div class="week-day-title">${dayData.day}, ${monthName.split(' ')[0]} ${dayData.date}</div>
+                                  <div class="week-day-cycle">${dayData.cycle || 'No class'}</div>
+                              </div>
+                              <div class="week-periods">
+                                  ${periodsHTML}
+                              </div>
+                          </div>
+                          ${dayData.note ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; margin-left: 0.25rem;">${dayData.note}</div>` : ''}
+                      </div>
+                  `;
+              } else {
+                  // Day has no data (weekend or no event)
+                  html += `
+                      <div class="${dayClass}">
+                          <div class="week-day-header">
+                              <div class="week-day-info">
+                                  <div class="week-day-title">${dayOfWeek}, ${monthName.split(' ')[0]} ${date}</div>
+                                  <div class="week-day-cycle"></div>
+                              </div>
+                          </div>
+                      </div>
+                  `;
+              }
+          }
+
+          html += `</div>`;
+
+          return html;
+      }
+
+      // Render periods inline (just dots, no labels)
+      function renderPeriodsInline(cycleCode) {
+          if (!cycleCode || cycleCode === 'HOLIDAY' || cycleCode === 'IN-SERVICE' ||
+              cycleCode === 'PTC' || cycleCode === 'SONGKRAN') {
+              return '';
+          }
+
+          const periods = getPeriodsForDay(cycleCode);
+
+          return periods.map(p => {
+              const isTeaching = selectedClasses.has(p);
+              const displayLabel = formatInlinePeriodLabel(p);
+              const extraClass = isLongInlineLabel(p) ? ' long-label' : '';
+              return `<div class="period-dot ${isTeaching ? 'teaching' : 'free'}${extraClass}" title="${getBlockTooltip(p)}">${displayLabel}</div>`;
+          }).join('');
+      }
+
+      // Helper function to format period labels
+      function formatPeriodLabel(period) {
+          return getSlotFromCode(period);
+      }
+
+      // Render periods (always compact - dots only)
+      function renderPeriods(cycleCode) {
+          if (!cycleCode || cycleCode === 'HOLIDAY' || cycleCode === 'IN-SERVICE' ||
+              cycleCode === 'PTC' || cycleCode === 'SONGKRAN') {
+              return '<div class="day-periods"></div>';
+          }
+
+          const periods = getPeriodsForDay(cycleCode);
+
+          return `<div class="day-periods">
+              ${periods.map(p => {
+                  const isTeaching = selectedClasses.has(p);
+                  const displayLabel = formatPeriodLabel(p);
+                  return `<div class="period-dot ${isTeaching ? 'teaching' : 'free'}" title="${getBlockTooltip(p)}">${displayLabel}</div>`;
+              }).join('')}
+          </div>`;
+      }
+
+      // Navigation
+      function prevMonth() {
+          const months = Object.keys(getFilteredCalendarData()).sort();
+          const currentIdx = months.indexOf(currentMonth);
+          if (currentIdx > 0) {
+              currentMonth = months[currentIdx - 1];
+              updateCalendar();
+          }
+      }
+
+      function nextMonth() {
+          const months = Object.keys(getFilteredCalendarData()).sort();
+          const currentIdx = months.indexOf(currentMonth);
+          if (currentIdx < months.length - 1) {
+              currentMonth = months[currentIdx + 1];
+              updateCalendar();
+          }
+      }
+
+      // View toggles
+      function refreshDisplayModeButtons() {
+          const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+          document.getElementById('monthlyBtn').classList.toggle('active', currentView === 'monthly');
+          document.getElementById('weeklyBtn').classList.toggle('active', currentView === 'weekly');
+          document.getElementById('lightModeBtn').classList.toggle('active', !isDark);
+          document.getElementById('darkModeBtn').classList.toggle('active', isDark);
+      }
+
+      function setView(view) {
+          currentView = view;
+          refreshDisplayModeButtons();
+
+          // Set body class for print orientation
+          document.body.className = `view-${view}`;
+
+          // Update print orientation style
+          updatePrintOrientation();
+
+          updateCalendar();
+      }
+
+      // Update print page orientation based on current view
+      function updatePrintOrientation() {
+          // Remove existing print orientation style if present
+          const existingStyle = document.getElementById('print-orientation-style');
+          if (existingStyle) {
+              existingStyle.remove();
+          }
+
+          // Create new style tag
+          const style = document.createElement('style');
+          style.id = 'print-orientation-style';
+
+          if (currentView === 'monthly') {
+              style.textContent = '@page { size: A4 landscape; }';
+          } else {
+              style.textContent = '@page { size: A4 portrait; }';
+          }
+
+          document.head.appendChild(style);
+      }
+
+      // Also update orientation before window print
+      window.onbeforeprint = function() {
+          updatePrintOrientation();
+      };
+
+      function setTheme(theme) {
+          const html = document.documentElement;
+          if (theme === 'dark') {
+              html.setAttribute('data-theme', 'dark');
+          } else {
+              html.setAttribute('data-theme', '');
+          }
+          refreshDisplayModeButtons();
+          saveSettings();
+      }
+
+      // Color customization
+      function updateColors() {
+          const teachingColor = sanitizeHexColor(document.getElementById('teachingColor').value, '#10b981');
+          const freeColor = sanitizeHexColor(document.getElementById('freeColor').value, '#e5e7eb');
+          document.getElementById('teachingColor').value = teachingColor;
+          document.getElementById('freeColor').value = freeColor;
+          document.documentElement.style.setProperty('--teaching-color', teachingColor);
+          document.documentElement.style.setProperty('--free-color', freeColor);
+          refreshColorSwatches();
+          saveSettings();
+      }
+
+      // Export to PDF
+      async function exportToPDF() {
+          const { jsPDF } = window.jspdf;
+          const months = Object.keys(getFilteredCalendarData()).sort();
+
+          if (months.length === 0) {
+              alert('No calendar data to export! Please upload ICS files first.');
+              return;
+          }
+
+          const originalView = currentView;
+
+          // Create PDF with appropriate orientation
+          const orientation = currentView === 'monthly' ? 'landscape' : 'portrait';
+          const pdf = new jsPDF(orientation, 'mm', 'a4');
+
+          for (let i = 0; i < months.length; i++) {
+              currentMonth = months[i];
+              updateCalendar();
+
+              // Wait for render
+              await new Promise(resolve => setTimeout(resolve, 100));
+
+              const element = document.getElementById('calendarView');
+              const canvas = await html2canvas(element, {
+                  scale: 2.5, // Increased from 1.5 for better quality
+                  backgroundColor: '#ffffff',
+                  logging: false,
+                  useCORS: true
+              });
+
+              // Use PNG with good compression for sharper text
+              const imgData = canvas.toDataURL('image/png');
+
+              const pdfWidth = orientation === 'landscape' ? 297 : 210;
+              const pdfHeight = orientation === 'landscape' ? 210 : 297;
+
+              const imgWidth = pdfWidth - 20; // 10mm margin on each side
+              const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+              if (i > 0) pdf.addPage([pdfWidth, pdfHeight], orientation);
+
+              // Center the image
+              const xOffset = 10;
+              const yOffset = 10;
+
+              pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, Math.min(imgHeight, pdfHeight - 20));
+          }
+
+          pdf.save('teacher-schedule-2026.pdf');
+
+          // Reset to original view and first month
+          currentView = originalView;
+          currentMonth = months[0];
+          updateCalendar();
+      }
+
+      // LocalStorage
+      function saveSettings() {
+          localStorage.setItem('teacherSchedule', JSON.stringify({
+              selectedClasses: Array.from(selectedClasses),
+              darkMode: document.documentElement.getAttribute('data-theme') === 'dark',
+              teachingColor: document.getElementById('teachingColor').value,
+              freeColor: document.getElementById('freeColor').value,
+              scheduleAssignments
+          }));
+      }
+
+      function loadSettings() {
+          const saved = localStorage.getItem('teacherSchedule');
+          if (saved) {
+              const settings = JSON.parse(saved);
+              selectedClasses = new Set(settings.selectedClasses || []);
+              scheduleAssignments = settings.scheduleAssignments || {};
+
+              if (settings.darkMode) {
+                  document.documentElement.setAttribute('data-theme', 'dark');
+              }
+
+              if (settings.teachingColor) {
+                  document.getElementById('teachingColor').value = settings.teachingColor;
+                  document.documentElement.style.setProperty('--teaching-color', settings.teachingColor);
+              }
+
+              if (settings.freeColor) {
+                  document.getElementById('freeColor').value = settings.freeColor;
+                  document.documentElement.style.setProperty('--free-color', settings.freeColor);
+              }
+          }
+
+          refreshColorSwatches();
+          refreshDisplayModeButtons();
+
+          // Load imported calendar data if exists
+          const savedCalendar = localStorage.getItem('importedCalendar');
+          const useImported = localStorage.getItem('useImportedData');
+          if (savedCalendar && useImported === 'true') {
+              importedCalendarData = JSON.parse(savedCalendar);
+              useImportedData = true;
+              document.getElementById('uploadStatus').innerHTML = '<i class="fa-regular fa-circle-check"></i> Using imported calendar data';
+              document.getElementById('uploadStatus').style.color = 'var(--teaching-color)';
+          }
+
+          // Load date range if exists
+          const savedStartDate = localStorage.getItem('dateRangeStart');
+          const savedEndDate = localStorage.getItem('dateRangeEnd');
+          if (savedStartDate) {
+              dateRangeStart = savedStartDate.substring(0, 7); // Convert to YYYY-MM
+              document.getElementById('dateRangeStart').value = savedStartDate;
+          }
+          if (savedEndDate) {
+              dateRangeEnd = savedEndDate.substring(0, 7); // Convert to YYYY-MM
+              document.getElementById('dateRangeEnd').value = savedEndDate;
+          }
+      }
+    </script>
+  </body>
+</html>
