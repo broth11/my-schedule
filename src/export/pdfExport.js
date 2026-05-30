@@ -1,19 +1,64 @@
-// PDF Export — intentional PDF-specific layouts, not a screen screenshot.
-// Renders into a hidden off-screen DOM node with pdf-only classes.
+// PDF Export — direct jsPDF vector/text drawing. No html2canvas, no DOM screenshots.
 (function () {
   'use strict';
 
-  // ── Constants ──────────────────────────────────────────────────────────────
+  // ── Page geometry (mm) ────────────────────────────────────────────────────
 
-  const DAY_LETTERS    = ['A', 'B', 'C', 'D'];
-  const NUMERIC_SLOTS  = ['1', '2', '3', '4', '5'];
-  const SPECIAL_CYCLES = ['HOLIDAY', 'IN-SERVICE', 'PTC', 'SONGKRAN', 'NO-SCHOOL'];
+  // Monthly overview — A4 landscape
+  const MO_W = 297, MO_H = 210;
+  const MO_ML = 8, MO_MR = 8, MO_MT = 10, MO_MB = 8;
+  const MO_CW      = MO_W - MO_ML - MO_MR;  // 281 mm content width
+  const MO_COL_W   = MO_CW / 5;             // 56.2 mm per column
+  const MO_TITLE_Y = MO_MT + 6;             // 16 mm  – title baseline
+  const MO_HLINE_Y = MO_MT + 8;             // 18 mm  – underline
+  const MO_WDAY_Y  = MO_MT + 12;            // 22 mm  – weekday label baseline
+  const MO_GRID_Y0 = MO_MT + 14;            // 24 mm  – grid top
+  const MO_GRID_Y1 = MO_H - MO_MB;          // 202 mm – grid bottom
+  const MO_GRID_H  = MO_GRID_Y1 - MO_GRID_Y0; // 178 mm
 
-  // A4 dimensions in px at 96 dpi
-  const A4_LANDSCAPE_W = 1122; // 297mm
-  const A4_LANDSCAPE_H =  794; // 210mm
-  const A4_PORTRAIT_W  =  794; // 210mm
-  const A4_PORTRAIT_H  = 1123; // 297mm
+  // Daily list — A4 portrait
+  const DL_W = 210, DL_H = 297;
+  const DL_ML = 10, DL_MR = 10, DL_MT = 12, DL_MB = 10;
+  const DL_CW      = DL_W - DL_ML - DL_MR;  // 190 mm content width
+  const DL_HDR_Y   = DL_MT + 7;             // 19 mm  – week header baseline
+  const DL_HLINE_Y = DL_MT + 9;             // 21 mm  – header underline
+  const DL_DAYS_Y0 = DL_MT + 12;            // 24 mm  – days start
+  const DL_DAYS_H  = DL_H - DL_MB - DL_DAYS_Y0; // 263 mm
+  const DL_DAY_MAX = 64;                    // cap day height (mm)
+
+  // ── Color palette ─────────────────────────────────────────────────────────
+
+  const CLR = {
+    black:       '#111111',
+    dark:        '#333333',
+    gray:        '#555555',
+    mid:         '#777777',
+    light:       '#aaaaaa',
+    faint:       '#d8d8d8',
+    emptyCell:   '#f3f3f2',
+    specialCell: '#fffbeb',
+    cycleBg:     '#f0f0f0',
+    cycleText:   '#555555',
+    cycleBorder: '#cccccc',
+    spTagBg:     '#fef3c7',
+    spTagText:   '#92400e',
+    spTagBorder: '#fcd34d',
+    noteText:    '#666666',
+    overlayBar:  '#bfdbfe',
+    overlayLbl:  '#6b7280',
+    overlayText: '#1e3a8a',
+    roomBg:      '#f3f4f6',
+    roomBorder:  '#d6d3d1',
+    roomText:    '#374151',
+    catText:     '#78716c',
+    freeBg:      '#f3f4f6',
+    freeBorder:  '#e5e7eb',
+    freeText:    '#9ca3af',
+    dutyBg:      '#d1fae5',
+    dutyBorder:  '#6ee7b7',
+    dutyText:    '#065f46',
+    noSchool:    '#aaaaaa',
+  };
 
   const CAT_COLORS = {
     teaching: { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
@@ -23,546 +68,470 @@
     planning:  { bg: '#f5f5f4', text: '#57534e', border: '#d6d3d1' },
     other:     { bg: '#f7f6f5', text: '#57534e', border: '#d6d3d1' },
   };
-  const DUTY_SINGLE_COLOR = { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' };
-  const FREE_COLOR        = { bg: '#f3f4f6', text: '#9ca3af', border: '#e5e7eb' };
 
   const CAT_LABELS = {
-    teaching: 'Teaching', homeroom: 'Homeroom', advisory: 'Advisory',
-    elb: 'ELB', planning: 'Planning', other: 'Other',
+    teaching:'Teaching', homeroom:'Homeroom', advisory:'Advisory',
+    elb:'ELB', planning:'Planning', other:'Other',
   };
 
-  // ── Small helpers ──────────────────────────────────────────────────────────
+  const SPECIAL_CYCLES = ['HOLIDAY', 'IN-SERVICE', 'PTC', 'SONGKRAN', 'NO-SCHOOL'];
+  const DAY_LETTERS    = ['A','B','C','D'];
+  const NUMERIC_SLOTS  = ['1','2','3','4','5'];
 
-  function buildBlockCode(letter, slot) {
-    return ['FX', 'ELB'].includes(slot) ? `${letter}-${slot}` : `${letter}${slot}`;
+  // ── Low-level jsPDF helpers ────────────────────────────────────────────────
+
+  function setFont(doc, size, weight) {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', weight || 'normal');
   }
 
+  function drawText(doc, str, x, y, { size=9, bold=false, italic=false, color=CLR.black, align='left' } = {}) {
+    doc.setFontSize(size);
+    const style = bold && italic ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal';
+    doc.setFont('helvetica', style);
+    doc.setTextColor(color);
+    doc.text(String(str), x, y, { align });
+    return doc.getTextWidth(String(str));
+  }
+
+  function getTextW(doc, str, size, bold) {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    return doc.getTextWidth(String(str));
+  }
+
+  // Truncate str to fit in maxW mm (adds … if cut). Requires font to be set by caller.
+  function truncate(doc, str, maxW, size, bold) {
+    if (!str) return '';
+    doc.setFontSize(size);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    if (doc.getTextWidth(str) <= maxW) return str;
+    let s = str;
+    while (s.length > 1 && doc.getTextWidth(s + '…') > maxW) s = s.slice(0, -1);
+    return s + '…';
+  }
+
+  // Wrap str to maxLines lines at maxW mm. Returns array of strings.
+  function wrapText(doc, str, maxW, maxLines, size, bold) {
+    if (!str) return [''];
+    doc.setFontSize(size);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    const lines = doc.splitTextToSize(str, maxW);
+    if (lines.length <= maxLines) return lines;
+    const out = lines.slice(0, maxLines);
+    let last = out[maxLines - 1];
+    while (last.length > 1 && doc.getTextWidth(last + '…') > maxW) last = last.slice(0,-1);
+    out[maxLines - 1] = last + '…';
+    return out;
+  }
+
+  function fillRect(doc, x, y, w, h, fill, stroke) {
+    if (fill)   doc.setFillColor(fill);
+    if (stroke) doc.setDrawColor(stroke);
+    const s = fill && stroke ? 'FD' : fill ? 'F' : stroke ? 'S' : null;
+    if (s) doc.rect(x, y, w, h, s);
+  }
+
+  function fillRoundRect(doc, x, y, w, h, r, fill, stroke) {
+    if (fill)   doc.setFillColor(fill);
+    if (stroke) doc.setDrawColor(stroke);
+    const s = fill && stroke ? 'FD' : fill ? 'F' : stroke ? 'S' : null;
+    if (s) doc.roundedRect(x, y, w, h, r, r, s);
+  }
+
+  function hline(doc, x1, x2, y, color, width) {
+    doc.setLineWidth(width || 0.2);
+    doc.setDrawColor(color || CLR.faint);
+    doc.line(x1, y, x2, y);
+  }
+
+  // ── Schedule helpers ──────────────────────────────────────────────────────
+
+  function buildBlockCode(letter, slot) {
+    return ['FX','ELB'].includes(slot) ? `${letter}-${slot}` : `${letter}${slot}`;
+  }
   function getSlotFromCode(code) {
     if (!code) return '';
     return code.includes('-') ? code.split('-')[1] : code.slice(1);
   }
-
-  function getDayLetterFromCycle(cycleCode) {
-    if (!cycleCode || typeof cycleCode !== 'string') return null;
-    const l = cycleCode.trim().charAt(0).toUpperCase();
+  function getDayLetter(cycle) {
+    if (!cycle) return null;
+    const l = cycle.trim().charAt(0).toUpperCase();
     return DAY_LETTERS.includes(l) ? l : null;
   }
-
-  function getPeriodsForDay(cycleCode) {
-    const letter = getDayLetterFromCycle(cycleCode);
+  function getPeriodsForDay(cycle) {
+    const letter = getDayLetter(cycle);
     if (!letter) return [];
-    const startSlot  = cycleCode.slice(letter.length);
+    const startSlot  = cycle.slice(letter.length);
     const startIndex = NUMERIC_SLOTS.indexOf(startSlot);
     const nums = startIndex > 0
       ? [...NUMERIC_SLOTS.slice(startIndex), ...NUMERIC_SLOTS.slice(0, startIndex)]
       : [...NUMERIC_SLOTS];
-    const ordered = [nums[0], nums[1], nums[2], nums[3], 'FX', 'ELB', nums[4]];
-    return ordered.map(slot => buildBlockCode(letter, slot));
+    return [nums[0],nums[1],nums[2],nums[3],'FX','ELB',nums[4]].map(s => buildBlockCode(letter,s));
   }
-
-  function chipInlineStyle(code, selectedClasses, scheduleCategories, dutyColorMode) {
-    const on = selectedClasses.has(code);
-    if (!on) {
-      return `background:${FREE_COLOR.bg};color:${FREE_COLOR.text};border:1px solid ${FREE_COLOR.border}`;
+  function blockColors(code, selClasses, catMap, dutyMode) {
+    if (!selClasses.has(code)) return { bg: CLR.freeBg, text: CLR.freeText, border: CLR.freeBorder };
+    if (dutyMode === 'category') {
+      const cat = catMap[code] || 'teaching';
+      return CAT_COLORS[cat] || CAT_COLORS.teaching;
     }
-    if (dutyColorMode === 'category') {
-      const cat = scheduleCategories[code] || 'teaching';
-      const c   = CAT_COLORS[cat] || CAT_COLORS.teaching;
-      return `background:${c.bg};color:${c.text};border:1px solid ${c.border}`;
-    }
-    return `background:${DUTY_SINGLE_COLOR.bg};color:${DUTY_SINGLE_COLOR.text};border:1px solid ${DUTY_SINGLE_COLOR.border}`;
+    return { bg: CLR.dutyBg, text: CLR.dutyText, border: CLR.dutyBorder };
   }
 
-  // ── Week grouping helpers ──────────────────────────────────────────────────
+  // ── Week grouping helpers ─────────────────────────────────────────────────
 
-  // Returns the Monday of the week that contains jsDate.
-  function getMondayOfWeek(jsDate) {
-    const d   = new Date(jsDate);
-    const dow = d.getDay(); // 0=Sun, 1=Mon, …, 6=Sat
-    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
-    return d;
+  function getMondayOfWeek(d) {
+    const r = new Date(d);
+    const dow = r.getDay();
+    r.setDate(r.getDate() + (dow === 0 ? -6 : 1 - dow));
+    return r;
   }
 
-  // Groups all calendar days (Mon–Fri only) into school weeks.
-  // Returns Array<{ weekKey: string, monday: Date, days: Array<{year,month,date,data,jsDate}> }>
   function groupCalendarDaysByWeek(calendarData) {
-    const allDays = [];
-    Object.keys(calendarData).sort().forEach(monthKey => {
-      const [year, month] = monthKey.split('-').map(Number);
-      (calendarData[monthKey] || []).forEach(d => {
-        const jsDate = new Date(year, month - 1, d.date);
-        const dow    = jsDate.getDay();
-        if (dow === 0 || dow === 6) return; // skip weekends
-        allDays.push({ year, month, date: d.date, data: d, jsDate });
+    const all = [];
+    Object.keys(calendarData).sort().forEach(mk => {
+      const [y, m] = mk.split('-').map(Number);
+      (calendarData[mk] || []).forEach(d => {
+        const j = new Date(y, m-1, d.date);
+        const dow = j.getDay();
+        if (dow === 0 || dow === 6) return;
+        all.push({ year:y, month:m, date:d.date, data:d, jsDate:j });
       });
     });
-
-    allDays.sort((a, b) => a.jsDate - b.jsDate);
-
-    const weekMap = new Map();
-    allDays.forEach(day => {
-      const monday  = getMondayOfWeek(day.jsDate);
-      const weekKey = monday.toISOString().slice(0, 10);
-      if (!weekMap.has(weekKey)) weekMap.set(weekKey, { monday, days: [] });
-      weekMap.get(weekKey).days.push(day);
+    all.sort((a,b) => a.jsDate - b.jsDate);
+    const map = new Map();
+    all.forEach(day => {
+      const mon = getMondayOfWeek(day.jsDate);
+      const k   = mon.toISOString().slice(0,10);
+      if (!map.has(k)) map.set(k, { monday:mon, days:[] });
+      map.get(k).days.push(day);
     });
-
-    return Array.from(weekMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([weekKey, { monday, days }]) => ({ weekKey, monday, days }));
+    return [...map.entries()].sort(([a],[b]) => a.localeCompare(b))
+      .map(([k,{monday,days}]) => ({ weekKey:k, monday, days }));
   }
 
   function formatWeekLabel(days) {
-    if (days.length === 0) return '';
-    const first      = days[0].jsDate;
-    const last       = days[days.length - 1].jsDate;
-    const year       = last.getFullYear();
-    const firstMonth = first.toLocaleDateString('en-US', { month: 'long' });
-    const lastMonth  = last.toLocaleDateString('en-US',  { month: 'long' });
-
-    if (firstMonth === lastMonth) {
-      return `${firstMonth} ${first.getDate()}–${last.getDate()}, ${year}`;
-    }
-    const fm = first.toLocaleDateString('en-US', { month: 'short' });
-    const lm = last.toLocaleDateString('en-US',  { month: 'short' });
-    return `${fm} ${first.getDate()} – ${lm} ${last.getDate()}, ${year}`;
+    if (!days.length) return '';
+    const f = days[0].jsDate, l = days[days.length-1].jsDate;
+    const yr = l.getFullYear();
+    const fm = f.toLocaleDateString('en-US',{month:'long'});
+    const lm = l.toLocaleDateString('en-US',{month:'long'});
+    if (fm === lm) return `${fm} ${f.getDate()}–${l.getDate()}, ${yr}`;
+    return `${f.toLocaleDateString('en-US',{month:'short'})} ${f.getDate()} – ${l.toLocaleDateString('en-US',{month:'short'})} ${l.getDate()}, ${yr}`;
   }
 
-  // ── Overlay rendering helpers ─────────────────────────────────────────────
+  // ── Monthly overview page ─────────────────────────────────────────────────
 
-  // Compact overlay block for monthly cells: show first title, "+N more" if many.
-  function _pmoOverlayHTML(evs) {
-    if (!evs || evs.length === 0) return '';
-    const first = evs[0].title;
-    const more  = evs.length > 1 ? ` <span class="pmo-overlay-more">+${evs.length - 1}</span>` : '';
-    return `<div class="pmo-overlay">${first}${more}</div>`;
-  }
-
-  // Full overlay block for weekly daily pages.
-  function _pdwOverlayHTML(evs) {
-    if (!evs || evs.length === 0) return '';
-    const items = evs.map(ev => {
-      const time = ev.startTime ? `<span class="pdw-overlay-time">${ev.startTime}</span> ` : '';
-      return `<div class="pdw-overlay-event">${time}<span class="pdw-overlay-title">${ev.title}</span></div>`;
-    }).join('');
-    return `<div class="pdw-overlay"><span class="pdw-overlay-label">Calendar</span>${items}</div>`;
-  }
-
-  // ── Monthly overview HTML builder ──────────────────────────────────────────
-
-  function buildMonthlyPageHTML(monthKey, days, selectedClasses, scheduleAssignments, scheduleCategories, dutyColorMode, overlayEventsByDate) {
+  function drawMonthlyPage(doc, monthKey, days, selClasses, assignments, catMap, dutyMode, overlay) {
     const [year, month] = monthKey.split('-').map(Number);
-    const monthName     = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    const daysInMonth   = new Date(year, month, 0).getDate();
+    const monthName = new Date(year, month-1).toLocaleDateString('en-US',{month:'long', year:'numeric'});
+    const daysInMonth = new Date(year, month, 0).getDate();
 
     const dayMap = {};
     days.forEach(d => { dayMap[d.date] = d; });
 
-    // Build Mon–Fri weeks, padding the first row with empty slots
+    // Build Mon–Fri week grid (null = empty slot)
     const weeks = [];
-    let week    = [];
-
-    const firstDow   = new Date(year, month - 1, 1).getDay(); // 0=Sun
-    const emptyStart = firstDow === 0 ? 0 : (firstDow === 6 ? 0 : firstDow - 1);
-
-    for (let i = 0; i < emptyStart && i < 5; i++) week.push(null);
-
+    let week = [];
+    const firstDow = new Date(year, month-1, 1).getDay();
+    const empty0   = firstDow === 0 ? 0 : firstDow === 6 ? 0 : firstDow - 1;
+    for (let i = 0; i < empty0 && i < 5; i++) week.push(null);
     for (let date = 1; date <= daysInMonth; date++) {
-      const dow = new Date(year, month - 1, date).getDay();
+      const dow = new Date(year, month-1, date).getDay();
       if (dow === 0 || dow === 6) continue;
       week.push({ date, data: dayMap[date] || null });
       if (week.length === 5) { weeks.push(week); week = []; }
     }
-    if (week.length > 0) {
-      while (week.length < 5) week.push(null);
-      weeks.push(week);
-    }
+    if (week.length) { while (week.length < 5) week.push(null); weeks.push(week); }
 
     const numWeeks = weeks.length;
-    const WDAYS    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const rowH     = MO_GRID_H / numWeeks;
 
-    let rows = '';
-    weeks.forEach(wk => {
-      let tds = '';
-      wk.forEach(cell => {
-        if (!cell) { tds += '<td class="pmo-empty"></td>'; return; }
-        const { date, data } = cell;
-        const cycle = data?.cycle || null;
-        const note  = data?.note  || '';
+    // ── Header ──
+    drawText(doc, monthName, MO_ML, MO_TITLE_Y, { size:13, bold:true, color:CLR.black });
+    hline(doc, MO_ML, MO_W - MO_MR, MO_HLINE_Y, CLR.faint, 0.3);
 
-        if (!data || !cycle) {
-          tds += `<td class="pmo-day pmo-noschool"><span class="pmo-dn">${date}</span></td>`;
-          return;
+    // ── Weekday labels ──
+    ['Mon','Tue','Wed','Thu','Fri'].forEach((d, i) => {
+      drawText(doc, d, MO_ML + i * MO_COL_W + 2, MO_WDAY_Y,
+        { size:7.5, bold:true, color:'#888888' });
+    });
+    hline(doc, MO_ML, MO_W - MO_MR, MO_GRID_Y0, '#999999', 0.4);
+
+    // ── Cell backgrounds (first pass) ──
+    weeks.forEach((wk, ri) => {
+      const rowY = MO_GRID_Y0 + ri * rowH;
+      wk.forEach((cell, ci) => {
+        const cx = MO_ML + ci * MO_COL_W;
+        if (!cell) {
+          fillRect(doc, cx, rowY, MO_COL_W, rowH, CLR.emptyCell, null);
+        } else {
+          const cycle = cell.data?.cycle || null;
+          const isSpecial = cycle && SPECIAL_CYCLES.includes(cycle);
+          if (!cycle) fillRect(doc, cx, rowY, MO_COL_W, rowH, CLR.emptyCell, null);
+          else if (isSpecial) fillRect(doc, cx, rowY, MO_COL_W, rowH, CLR.specialCell, null);
         }
-
-        const dateKey   = `${year}-${String(month).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
-        const overlayEvs = ((overlayEventsByDate || {})[dateKey] || []);
-        const overlayHTML = _pmoOverlayHTML(overlayEvs);
-
-        if (SPECIAL_CYCLES.includes(cycle)) {
-          tds += `<td class="pmo-day pmo-special">
-            <div class="pmo-top">
-              <span class="pmo-dn">${date}</span>
-              <span class="pmo-sptag">${cycle}</span>
-            </div>
-            ${note     ? `<div class="pmo-note">${note}</div>`  : ''}
-            ${overlayHTML}
-          </td>`;
-          return;
-        }
-
-        const periods = getPeriodsForDay(cycle);
-        const chips = periods.map(code => {
-          const slot  = getSlotFromCode(code);
-          const style = chipInlineStyle(code, selectedClasses, scheduleCategories, dutyColorMode);
-          return `<span class="pmo-chip" style="${style}">${slot}</span>`;
-        }).join('');
-
-        tds += `<td class="pmo-day">
-          <div class="pmo-top">
-            <span class="pmo-dn">${date}</span>
-            <span class="pmo-cycle">${cycle}</span>
-          </div>
-          ${note     ? `<div class="pmo-note">${note}</div>`  : ''}
-          ${overlayHTML}
-          <div class="pmo-chips">${chips}</div>
-        </td>`;
       });
-      rows += `<tr>${tds}</tr>`;
     });
 
-    // Embed numWeeks for CSS row-height calculation via a custom property.
-    // The row height = (available table body height) / numWeeks.
-    // We bake this as a CSS var on the table so no JS-in-style magic is needed.
-    return `<div class="pmo-page">
-      <div class="pmo-header"><span class="pmo-title">${monthName}</span></div>
-      <table class="pmo-table" style="--num-weeks:${numWeeks}">
-        <thead><tr>${WDAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+    // ── Grid lines (second pass, drawn over backgrounds) ──
+    doc.setLineWidth(0.22);
+    doc.setDrawColor(CLR.faint);
+    for (let c = 0; c <= 5; c++) {
+      const x = MO_ML + c * MO_COL_W;
+      doc.line(x, MO_GRID_Y0, x, MO_GRID_Y1);
+    }
+    for (let r = 0; r <= numWeeks; r++) {
+      const y = MO_GRID_Y0 + r * rowH;
+      doc.line(MO_ML, y, MO_W - MO_MR, y);
+    }
+
+    // ── Cell content (third pass, drawn over lines) ──
+    weeks.forEach((wk, ri) => {
+      const rowY = MO_GRID_Y0 + ri * rowH;
+      wk.forEach((cell, ci) => {
+        if (!cell) return;
+        const cx   = MO_ML + ci * MO_COL_W;
+        const { date, data } = cell;
+        const cycle    = data?.cycle || null;
+        const note     = data?.note  || '';
+        const dateKey  = `${year}-${String(month).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
+        const ovEvs    = (overlay || {})[dateKey] || [];
+        const pad      = 2;
+        const iw       = MO_COL_W - pad * 2;
+
+        if (!cycle) {
+          // no-school/gap
+          drawText(doc, String(date), cx + pad, rowY + 4.5,
+            { size:9, bold:true, color:CLR.light });
+          return;
+        }
+
+        let curY = rowY + pad;
+        const isSpecial = SPECIAL_CYCLES.includes(cycle);
+
+        // Date number
+        drawText(doc, String(date), cx + pad, curY + 4,
+          { size:10, bold:true, color:CLR.black });
+
+        if (isSpecial) {
+          // Special tag badge below date
+          curY += 5.5;
+          const tagW = getTextW(doc, cycle, 6.5, true) + 3;
+          fillRoundRect(doc, cx + pad, curY - 2.2, tagW, 3.8, 0.5,
+            CLR.spTagBg, CLR.spTagBorder);
+          drawText(doc, cycle, cx + pad + 1.5, curY + 1.2,
+            { size:6.5, bold:true, color:CLR.spTagText });
+          curY += 4;
+        } else {
+          // Cycle badge (top-right)
+          const cycW = getTextW(doc, cycle, 7, true) + 3;
+          fillRoundRect(doc, cx + MO_COL_W - pad - cycW, rowY + 1, cycW, 3.8, 0.5,
+            CLR.cycleBg, CLR.cycleBorder);
+          drawText(doc, cycle, cx + MO_COL_W - pad - cycW + 1.5, rowY + 3.8,
+            { size:7, bold:true, color:CLR.cycleText });
+          curY += 5.5;
+        }
+
+        // Note (max 2 lines)
+        if (note) {
+          const noteLines = wrapText(doc, note, iw, 2, 7, false);
+          noteLines.forEach(ln => {
+            drawText(doc, ln, cx + pad, curY, { size:7, color:CLR.noteText });
+            curY += 2.5;
+          });
+          curY += 0.5;
+        }
+
+        // Overlay events
+        if (ovEvs.length > 0) {
+          const first = truncate(doc, ovEvs[0].title,
+            iw - (ovEvs.length > 1 ? 7 : 0), 6.5, false);
+          const more = ovEvs.length > 1 ? ` +${ovEvs.length - 1}` : '';
+          drawText(doc, first + more, cx + pad, curY,
+            { size:6.5, color:CLR.overlayText });
+          curY += 2.5;
+        }
+
+        // Block chips (near bottom of cell)
+        if (!isSpecial) {
+          const periods  = getPeriodsForDay(cycle);
+          const chipsBot = rowY + rowH - 1.5;
+          const chipH    = 3.2;
+          const chipsTop = chipsBot - chipH;
+          if (periods.length > 0 && chipsTop > curY) {
+            const totalGap = 0.4 * (periods.length - 1);
+            const chipW    = (iw - totalGap) / periods.length;
+            periods.forEach((code, pi) => {
+              const col  = blockColors(code, selClasses, catMap, dutyMode);
+              const chX  = cx + pad + pi * (chipW + 0.4);
+              fillRoundRect(doc, chX, chipsTop, chipW, chipH, 0.4,
+                col.bg, col.border);
+              const slot  = getSlotFromCode(code);
+              const slotW = getTextW(doc, slot, 5.5, true);
+              drawText(doc, slot, chX + (chipW - slotW) / 2, chipsTop + chipH - 0.7,
+                { size:5.5, bold:true, color:col.text });
+            });
+          }
+        }
+      });
+    });
   }
 
-  // ── Daily list — week page builder ────────────────────────────────────────
+  // ── Daily list week page ───────────────────────────────────────────────────
 
-  function buildWeekPageHTML(weekLabel, weekDays, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode, overlayEventsByDate) {
-    let daysHTML = '';
+  function drawWeekPage(doc, weekLabel, weekDays, selClasses, assignments, catMap, rooms, dutyMode, overlay) {
+    const numDays = weekDays.length;
+    const dayH    = Math.min(DL_DAYS_H / numDays, DL_DAY_MAX);
 
-    weekDays.forEach(({ jsDate, date, data }) => {
-      const weekday    = jsDate.toLocaleDateString('en-US', { weekday: 'long' });
-      const monthShort = jsDate.toLocaleDateString('en-US', { month: 'short' });
-      const cycle      = data?.cycle || null;
-      const isSpecial  = cycle && SPECIAL_CYCLES.includes(cycle);
+    // ── Week header ──
+    drawText(doc, weekLabel, DL_ML, DL_HDR_Y, { size:13, bold:true, color:CLR.black });
+    hline(doc, DL_ML, DL_W - DL_MR, DL_HLINE_Y, CLR.dark, 0.6);
 
-      const pdwDateKey  = `${jsDate.getFullYear()}-${String(jsDate.getMonth()+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
-      const pdwOverlay  = _pdwOverlayHTML(((overlayEventsByDate || {})[pdwDateKey] || []));
+    weekDays.forEach(({ jsDate, date, data }, di) => {
+      const dayY      = DL_DAYS_Y0 + di * dayH;
+      const weekday   = jsDate.toLocaleDateString('en-US',{weekday:'long'});
+      const monShort  = jsDate.toLocaleDateString('en-US',{month:'short'});
+      const cycle     = data?.cycle || null;
+      const isSpecial = cycle && SPECIAL_CYCLES.includes(cycle);
+      const dateKey   = `${jsDate.getFullYear()}-${String(jsDate.getMonth()+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
+      const ovEvs     = (overlay || {})[dateKey] || [];
 
-      daysHTML += `<div class="pdw-day">
-        <div class="pdw-day-head">
-          <span class="pdw-date">${weekday}, ${monthShort} ${date}</span>
-          ${cycle && !isSpecial ? `<span class="pdw-cycle">${cycle}</span>` : ''}
-          ${isSpecial           ? `<span class="pdw-sptag">${cycle}</span>` : ''}
-          ${!cycle              ? `<span class="pdw-noschool">No school</span>` : ''}
-        </div>
-        ${data?.note  ? `<div class="pdw-note">${data.note}</div>`  : ''}
-        ${pdwOverlay}`;
+      // Divider between days
+      if (di > 0) hline(doc, DL_ML, DL_W - DL_MR, dayY, '#d0d0d0', 0.3);
 
+      let curY = dayY + 5;
+
+      // ── Day header ──
+      const labelW = drawText(doc, `${weekday}, ${monShort} ${date}`,
+        DL_ML, curY, { size:10.5, bold:true, color:CLR.black });
+
+      // Badge right of label
+      const bx = DL_ML + labelW + 3;
       if (cycle && !isSpecial) {
-        const periods = getPeriodsForDay(cycle);
-        daysHTML += `<div class="pdw-blocks">`;
-        periods.forEach(code => {
-          const slot     = getSlotFromCode(code);
-          const assigned = selectedClasses.has(code);
-          const cat      = assigned ? (scheduleCategories[code] || 'teaching') : null;
-          const title    = scheduleAssignments[code] || '';
-          const room     = scheduleRooms[code]       || '';
-          const catLabel = cat ? (CAT_LABELS[cat] || cat) : '';
-          const style    = chipInlineStyle(code, selectedClasses, scheduleCategories, dutyColorMode);
+        const bw = getTextW(doc, cycle, 7.5, true) + 3;
+        fillRoundRect(doc, bx, curY - 3.2, bw, 4, 0.5, CLR.cycleBg, CLR.cycleBorder);
+        drawText(doc, cycle, bx + 1.5, curY, { size:7.5, bold:true, color:CLR.cycleText });
+      } else if (isSpecial) {
+        const bw = getTextW(doc, cycle, 7.5, true) + 3;
+        fillRoundRect(doc, bx, curY - 3.2, bw, 4, 0.5, CLR.spTagBg, CLR.spTagBorder);
+        drawText(doc, cycle, bx + 1.5, curY, { size:7.5, bold:true, color:CLR.spTagText });
+      } else {
+        drawText(doc, 'No school', bx, curY, { size:8, italic:true, color:CLR.noSchool });
+      }
+      curY += 4;
 
-          daysHTML += `<div class="pdw-block${assigned ? ' assigned' : ''}">
-            <span class="pdw-code" style="${style}">${slot}</span>
-            <div class="pdw-info">
-              ${catLabel ? `<span class="pdw-cat">${catLabel}</span>` : ''}
-              ${title    ? `<span class="pdw-title">${title}</span>`  : (!assigned ? `<span class="pdw-free">—</span>` : '')}
-              ${room     ? `<span class="pdw-room">${room}</span>`    : ''}
-            </div>
-          </div>`;
-        });
-        daysHTML += `</div>`;
+      // ── Official note ──
+      if (data?.note) {
+        const noteTxt = truncate(doc, data.note, DL_CW, 7.5, false);
+        drawText(doc, noteTxt, DL_ML, curY, { size:7.5, italic:true, color:'#6b7280' });
+        curY += 3;
       }
 
-      daysHTML += `</div>`;
-    });
-
-    return `<div class="pdw-page">
-      <div class="pdw-week-header">${weekLabel}</div>
-      <div class="pdw-days">${daysHTML}</div>
-    </div>`;
-  }
-
-  // ── CSS strings ────────────────────────────────────────────────────────────
-
-  // Monthly: fills the A4 landscape page height. The outer div is exactly
-  // A4_LANDSCAPE_H px tall. The table stretches to consume remaining space.
-  const MONTHLY_CSS = `
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, Helvetica, sans-serif; }
-.pmo-page {
-  width: ${A4_LANDSCAPE_W}px; height: ${A4_LANDSCAPE_H}px;
-  display: flex; flex-direction: column;
-  padding: 14px 18px 10px;
-  overflow: hidden;
-}
-.pmo-header { margin-bottom: 8px; flex-shrink: 0; }
-.pmo-title { font-size: 17px; font-weight: 700; color: #111; }
-.pmo-table {
-  flex: 1; min-height: 0;
-  width: 100%; border-collapse: collapse; table-layout: fixed;
-  height: 100%;
-}
-.pmo-table thead { flex-shrink: 0; }
-.pmo-table th {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  color: #555; text-align: left; padding: 5px 7px;
-  border-bottom: 2px solid #ccc;
-}
-.pmo-table tbody { height: 100%; }
-.pmo-table tbody tr { height: calc(100% / var(--num-weeks, 5)); }
-.pmo-table td {
-  vertical-align: top; border: 1px solid #e0e0e0;
-  padding: 5px 7px; overflow: hidden;
-}
-.pmo-empty   { background: #f8f8f8; }
-.pmo-noschool { background: #f8f8f8; }
-.pmo-special { background: #fffbeb; }
-.pmo-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
-.pmo-dn { font-size: 14px; font-weight: 700; color: #111; }
-.pmo-cycle {
-  font-size: 9px; font-weight: 700; color: #444;
-  background: #f0f0f0; padding: 1px 5px; border-radius: 3px;
-}
-.pmo-sptag {
-  font-size: 8px; font-weight: 700; text-transform: uppercase; color: #92400e;
-  background: #fef3c7; padding: 1px 4px; border-radius: 3px;
-}
-.pmo-note {
-  font-size: 8.5px; color: #555; margin-bottom: 4px; line-height: 1.35;
-  overflow: hidden; display: -webkit-box;
-  -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-}
-.pmo-overlay {
-  font-size: 8px; color: #1e40af; font-weight: 500; line-height: 1.3;
-  margin-bottom: 3px;
-  overflow: hidden; display: -webkit-box;
-  -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-}
-.pmo-overlay-more { font-weight: 700; color: #6b7280; }
-.pmo-chips { display: flex; flex-wrap: wrap; gap: 2px; margin-top: auto; padding-top: 3px; }
-.pmo-chip {
-  font-size: 8.5px; font-weight: 700; padding: 1px 4px;
-  border-radius: 3px; line-height: 1.5;
-}
-`;
-
-  // Weekly daily list: fills A4 portrait. One week per page.
-  const WEEKLY_CSS = `
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, Helvetica, sans-serif; }
-.pdw-page {
-  width: ${A4_PORTRAIT_W}px; height: ${A4_PORTRAIT_H}px;
-  padding: 20px 24px 16px;
-  display: flex; flex-direction: column;
-  overflow: hidden;
-}
-.pdw-week-header {
-  font-size: 15px; font-weight: 700; color: #111;
-  padding-bottom: 8px; border-bottom: 2px solid #222;
-  margin-bottom: 10px; flex-shrink: 0;
-}
-.pdw-days {
-  flex: 1; min-height: 0;
-  display: flex; flex-direction: column;
-}
-.pdw-day {
-  flex: 1; min-height: 0;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 7px 0 6px;
-  overflow: hidden;
-}
-.pdw-day:last-child { border-bottom: none; }
-.pdw-day-head { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
-.pdw-date { font-size: 12px; font-weight: 700; color: #111; min-width: 148px; }
-.pdw-cycle {
-  font-size: 9px; font-weight: 700; color: #374151;
-  background: #f3f4f6; padding: 1px 5px; border-radius: 3px;
-}
-.pdw-sptag {
-  font-size: 9px; font-weight: 700; text-transform: uppercase; color: #92400e;
-  background: #fef3c7; padding: 1px 5px; border-radius: 3px;
-}
-.pdw-noschool { font-size: 10px; color: #9ca3af; font-style: italic; }
-.pdw-note { font-size: 10px; color: #6b7280; font-style: italic; margin-bottom: 2px;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.pdw-blocks { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; }
-.pdw-block { display: flex; align-items: center; gap: 6px; }
-.pdw-code {
-  display: inline-block; font-size: 9.5px; font-weight: 700;
-  padding: 2px 5px; border-radius: 3px; min-width: 30px; text-align: center;
-  flex-shrink: 0;
-}
-.pdw-info { display: flex; align-items: center; gap: 5px; font-size: 10px; overflow: hidden; }
-.pdw-cat { color: #6b7280; font-weight: 500; flex-shrink: 0; min-width: 50px; }
-.pdw-title { color: #111; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.pdw-room {
-  color: #374151; background: #f3f4f6;
-  padding: 1px 4px; border-radius: 3px; font-size: 9px;
-  flex-shrink: 0; white-space: nowrap;
-}
-.pdw-free { color: #c0c0c0; }
-.pdw-overlay {
-  margin: 2px 0 3px;
-  padding: 3px 6px;
-  background: #eff6ff; border-left: 2px solid #93c5fd;
-  border-radius: 0 3px 3px 0;
-}
-.pdw-overlay-label {
-  display: block; font-size: 8px; font-weight: 700; letter-spacing: 0.06em;
-  text-transform: uppercase; color: #6b7280; margin-bottom: 2px;
-}
-.pdw-overlay-event {
-  font-size: 9.5px; color: #1e3a8a; line-height: 1.4;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.pdw-overlay-time { font-weight: 700; margin-right: 3px; }
-.pdw-overlay-title {}
-`;
-
-  // ── Preflight: assert no unsupported CSS color functions ──────────────────
-
-  const UNSAFE_COLOR_RE = /oklch\(|(?:^|[^a-z])lch\(|(?:^|[^a-z])lab\(|color-mix\(/i;
-  const CHECKED_PROPS   = [
-    'color', 'backgroundColor',
-    'borderColor', 'borderTopColor', 'borderRightColor',
-    'borderBottomColor', 'borderLeftColor',
-    'boxShadow', 'textShadow',
-  ];
-
-  function assertHtml2CanvasSafeColors(root) {
-    const walk = (el) => {
-      if (el.nodeType !== 1) return;
-      const style = window.getComputedStyle(el);
-      CHECKED_PROPS.forEach(prop => {
-        const val = style[prop];
-        if (val && UNSAFE_COLOR_RE.test(val)) {
-          console.error(
-            '[pdfExport] Unsafe color detected',
-            { element: el, className: el.className, property: prop, value: val }
-          );
-          throw new Error(
-            `PDF export blocked: unsupported CSS color detected (${prop}: ${val})`
-          );
+      // ── Overlay calendar events ──
+      if (ovEvs.length > 0) {
+        const maxShow = Math.min(ovEvs.length, 3);
+        const barH    = 2.5 + maxShow * 3 + (ovEvs.length > 3 ? 3 : 0);
+        fillRect(doc, DL_ML, curY - 0.5, 1.5, barH, CLR.overlayBar, null);
+        drawText(doc, 'CALENDAR', DL_ML + 2.5, curY + 1.2,
+          { size:6, bold:true, color:CLR.overlayLbl });
+        curY += 3;
+        for (let ei = 0; ei < maxShow; ei++) {
+          const ev = ovEvs[ei];
+          const prefix = ev.startTime ? ev.startTime + '  ' : '';
+          const line   = truncate(doc, prefix + ev.title, DL_CW - 4, 8, false);
+          drawText(doc, line, DL_ML + 2.5, curY, { size:8, color:CLR.overlayText });
+          curY += 3;
         }
-      });
-      el.childNodes.forEach(walk);
-    };
-    walk(root);
+        if (ovEvs.length > 3) {
+          drawText(doc, `+${ovEvs.length - 3} more`, DL_ML + 2.5, curY,
+            { size:7, color:CLR.overlayLbl });
+          curY += 3;
+        }
+        curY += 1;
+      }
+
+      // ── Teacher blocks ──
+      if (cycle && !isSpecial) {
+        const dayBottom = dayY + dayH - 1.5;
+        getPeriodsForDay(cycle).forEach(code => {
+          if (curY > dayBottom) return; // stay within day bounds
+          const slot     = getSlotFromCode(code);
+          const assigned = selClasses.has(code);
+          const col      = blockColors(code, selClasses, catMap, dutyMode);
+          const cat      = assigned ? (catMap[code] || 'teaching') : null;
+          const catLbl   = cat ? (CAT_LABELS[cat] || cat) : '';
+          const title    = assignments[code] || '';
+          const room     = rooms[code]       || '';
+
+          // Block code chip
+          const chipW = 8, chipH = 3.5;
+          fillRoundRect(doc, DL_ML, curY - 2.8, chipW, chipH, 0.5, col.bg, col.border);
+          const slotW = getTextW(doc, slot, 7, true);
+          drawText(doc, slot, DL_ML + (chipW - slotW) / 2, curY,
+            { size:7, bold:true, color:col.text });
+
+          let tx = DL_ML + chipW + 2;
+
+          // Category
+          if (catLbl) {
+            drawText(doc, catLbl, tx, curY, { size:7.5, color:CLR.catText });
+            tx += 18;
+          }
+
+          // Room badge (right-aligned, drawn before title so we know its width)
+          let roomBadgeW = 0;
+          if (room) {
+            const rTextW   = getTextW(doc, room, 7, false);
+            roomBadgeW     = rTextW + 3;
+            const rx       = DL_W - DL_MR - roomBadgeW;
+            fillRoundRect(doc, rx, curY - 2.8, roomBadgeW, 3.5, 0.4,
+              CLR.roomBg, CLR.roomBorder);
+            drawText(doc, room, rx + 1.5, curY, { size:7, color:CLR.roomText });
+          }
+
+          // Title
+          if (title) {
+            const maxTW = DL_W - DL_MR - tx - roomBadgeW - (room ? 3 : 0);
+            const tDisp = truncate(doc, title, maxTW, 7.5, true);
+            drawText(doc, tDisp, tx, curY, { size:7.5, bold:true, color:CLR.black });
+          } else if (!assigned) {
+            drawText(doc, '—', tx, curY, { size:7.5, color:'#cccccc' });
+          }
+
+          curY += 3.5;
+        });
+      }
+    });
   }
 
-  // ── Render helpers ─────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────────────
 
-  function createRenderContainer(widthPx, heightPx) {
-    const el = document.createElement('div');
-    el.style.cssText = `
-      position: fixed; left: -9999px; top: 0; z-index: -100;
-      width: ${widthPx}px; height: ${heightPx}px;
-      background: #fff; overflow: hidden;
-      font-family: Arial, Helvetica, sans-serif;
-    `;
-    document.body.appendChild(el);
-    return el;
-  }
-
-  async function waitFrames(n = 2) {
-    for (let i = 0; i < n; i++) {
-      await new Promise(r => requestAnimationFrame(r));
-    }
-  }
-
-  // ── Public: generate monthly overview PDF ─────────────────────────────────
-
-  async function generateMonthlyOverviewPDF(calendarData, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode, overlayEventsByDate) {
+  async function generateMonthlyOverviewPDF(calendarData, selClasses, assignments, catMap, rooms, dutyMode, overlay) {
     const { jsPDF } = window.jspdf;
     const months = Object.keys(calendarData).sort();
-    if (months.length === 0) return false;
+    if (!months.length) return false;
 
-    const pdfW = 297, pdfH = 210; // A4 landscape mm
-
-    const pdf       = new jsPDF('landscape', 'mm', 'a4');
-    const container = createRenderContainer(A4_LANDSCAPE_W, A4_LANDSCAPE_H);
-
-    for (let i = 0; i < months.length; i++) {
-      const monthKey = months[i];
-      const days     = calendarData[monthKey] || [];
-      const pageHTML = buildMonthlyPageHTML(monthKey, days, selectedClasses, scheduleAssignments, scheduleCategories, dutyColorMode, overlayEventsByDate);
-
-      container.innerHTML = `<style>${MONTHLY_CSS}</style>${pageHTML}`;
-      await waitFrames();
-
-      assertHtml2CanvasSafeColors(container);
-      const canvas = await html2canvas(container, {
-        scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true,
-        width: A4_LANDSCAPE_W, height: A4_LANDSCAPE_H,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const imgW    = pdfW - 16;
-      const imgH    = pdfH - 16;
-
-      if (i > 0) pdf.addPage([pdfW, pdfH], 'landscape');
-      pdf.addImage(imgData, 'PNG', 8, 8, imgW, imgH);
-    }
-
-    document.body.removeChild(container);
-    pdf.save('my-schedule-monthly-overview.pdf');
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    months.forEach((mk, i) => {
+      if (i > 0) doc.addPage('a4', 'landscape');
+      drawMonthlyPage(doc, mk, calendarData[mk] || [], selClasses, assignments, catMap, dutyMode, overlay);
+    });
+    doc.save('my-schedule-monthly-overview.pdf');
     return true;
   }
 
-  // ── Public: generate daily list PDF (one page per school week) ────────────
-
-  async function generateDailyListPDF(calendarData, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode, overlayEventsByDate) {
+  async function generateDailyListPDF(calendarData, selClasses, assignments, catMap, rooms, dutyMode, overlay) {
     const { jsPDF } = window.jspdf;
     const weeks = groupCalendarDaysByWeek(calendarData);
-    if (weeks.length === 0) return false;
+    if (!weeks.length) return false;
 
-    const pdfW = 210, pdfH = 297; // A4 portrait mm
-
-    const pdf       = new jsPDF('portrait', 'mm', 'a4');
-    const container = createRenderContainer(A4_PORTRAIT_W, A4_PORTRAIT_H);
-
-    for (let i = 0; i < weeks.length; i++) {
-      const { days } = weeks[i];
-      const weekLabel = formatWeekLabel(days);
-      const pageHTML  = buildWeekPageHTML(weekLabel, days, selectedClasses, scheduleAssignments, scheduleCategories, scheduleRooms, dutyColorMode, overlayEventsByDate);
-
-      container.innerHTML = `<style>${WEEKLY_CSS}</style>${pageHTML}`;
-      await waitFrames();
-
-      assertHtml2CanvasSafeColors(container);
-      const canvas = await html2canvas(container, {
-        scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true,
-        width: A4_PORTRAIT_W, height: A4_PORTRAIT_H,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const imgW    = pdfW - 16;
-      const imgH    = pdfH - 16;
-
-      if (i > 0) pdf.addPage([pdfW, pdfH], 'portrait');
-      pdf.addImage(imgData, 'PNG', 8, 8, imgW, imgH);
-    }
-
-    document.body.removeChild(container);
-    pdf.save('my-schedule-daily-list.pdf');
+    const doc = new jsPDF('portrait', 'mm', 'a4');
+    weeks.forEach(({ days }, i) => {
+      if (i > 0) doc.addPage('a4', 'portrait');
+      drawWeekPage(doc, formatWeekLabel(days), days, selClasses, assignments, catMap, rooms, dutyMode, overlay);
+    });
+    doc.save('my-schedule-daily-list.pdf');
     return true;
   }
 
