@@ -1,24 +1,24 @@
 :root {
-  --accent:        oklch(0.60 0.118 158);
-  --accent-strong: oklch(0.53 0.122 158);
-  --accent-tint:   oklch(0.96 0.030 158);
-  --accent-tint-2: oklch(0.93 0.045 158);
-  --accent-ring:   oklch(0.60 0.118 158 / 0.30);
+  --accent:        #10b981;
+  --accent-strong: #059669;
+  --accent-tint:   #ecfdf5;
+  --accent-tint-2: #d1fae5;
+  --accent-ring:   rgba(16,185,129,0.30);
 
-  --bg:      oklch(0.984 0.005 80);
-  --surface: oklch(1 0 0);
-  --ink:     oklch(0.27 0.012 75);
-  --ink-2:   oklch(0.44 0.012 75);
-  --muted:   oklch(0.60 0.010 75);
-  --faint:   oklch(0.72 0.008 75);
-  --line:    oklch(0.92 0.006 80);
-  --line-2:  oklch(0.88 0.006 80);
-  --cell:    oklch(0.992 0.004 80);
+  --bg:      #fafaf9;
+  --surface: #ffffff;
+  --ink:     #292524;
+  --ink-2:   #57534e;
+  --muted:   #78716c;
+  --faint:   #a8a29e;
+  --line:    #e7e5e4;
+  --line-2:  #d6d3d1;
+  --cell:    #fdfcfb;
 
   --radius: 14px;
   --radius-sm: 10px;
-  --shadow-card: 0 1px 2px oklch(0.27 0.012 75 / 0.04), 0 8px 24px oklch(0.27 0.012 75 / 0.05);
-  --shadow-pop: 0 8px 40px oklch(0.27 0.012 75 / 0.16);
+  --shadow-card: 0 1px 2px rgba(41,37,36,0.04), 0 8px 24px rgba(41,37,36,0.05);
+  --shadow-pop: 0 8px 40px rgba(41,37,36,0.16);
   font-family: "Hanken Grotesk", system-ui, sans-serif;
 }
 
@@ -183,7 +183,7 @@ body {
 
 /* non-teaching days */
 .day.special { background: var(--accent-tint); border-color: var(--accent-ring); }
-.day.special.neutral { background: oklch(0.96 0.006 75); border-color: var(--line-2); }
+.day.special.neutral { background: #f5f5f4; border-color: var(--line-2); }
 .tag {
   font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--accent-strong);
@@ -227,7 +227,7 @@ body {
 /* ---------- Overlay + Settings panel ---------- */
 .overlay {
   position: fixed; inset: 0;
-  background: oklch(0.27 0.012 75 / 0.42);
+  background: rgba(41,37,36,0.42);
   opacity: 0; pointer-events: none;
   transition: opacity .25s;
   z-index: 40;
@@ -259,7 +259,7 @@ body {
   cursor: pointer; display: grid; place-items: center; color: var(--ink-2);
   transition: background .15s;
 }
-.close-btn:hover { background: oklch(0.95 0.006 80); }
+.close-btn:hover { background: #f5f5f4; }
 .close-btn svg { width: 18px; height: 18px; }
 
 .panel-body { overflow-y: auto; padding: 24px 26px 36px; flex: 1; }
@@ -311,12 +311,12 @@ body {
   background: var(--surface);
   color: var(--ink);
 }
-.btn:hover { background: oklch(0.97 0.006 80); }
+.btn:hover { background: #f7f6f5; }
 .btn svg { width: 16px; height: 16px; flex: none; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover { background: var(--accent-strong); }
-.btn.danger { color: oklch(0.52 0.16 25); border-color: transparent; background: transparent; justify-content: flex-start; padding-left: 4px; }
-.btn.danger:hover { background: oklch(0.96 0.04 25); }
+.btn.danger { color: #dc2626; border-color: transparent; background: transparent; justify-content: flex-start; padding-left: 4px; }
+.btn.danger:hover { background: #fef2f2; }
 .btn-stack { display: flex; flex-direction: column; gap: 9px; }
 
 .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -350,7 +350,7 @@ body {
   transform: translateX(-50%) translateY(0);
   pointer-events: auto;
 }
-.toast.error { background: oklch(0.52 0.16 25); }
+.toast.error { background: #dc2626; }
 
 /* ---------- Period dots (daily view) ---------- */
 .period-dot {
@@ -429,7 +429,7 @@ body {
 .list-day:hover { border-color: var(--line-2); background: var(--surface); }
 .list-day.today { border-color: var(--accent); }
 .list-day.special { background: var(--accent-tint); border-color: var(--accent-ring); }
-.list-day.special.neutral { background: oklch(0.96 0.006 75); border-color: var(--line-2); }
+.list-day.special.neutral { background: #f5f5f4; border-color: var(--line-2); }
 .list-day.no-school { opacity: 0.55; }
 .list-day.expanded { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); background: var(--surface); }
 
@@ -543,11 +543,11 @@ body {
   color: #fff;
 }
 /* category overrides on detail codes */
-.list-detail-code.on.cat-homeroom { background: oklch(0.55 0.14 260); }
-.list-detail-code.on.cat-advisory { background: oklch(0.68 0.14 75); color: var(--ink); }
-.list-detail-code.on.cat-elb      { background: oklch(0.56 0.12 195); }
-.list-detail-code.on.cat-planning { background: oklch(0.80 0.005 80); color: var(--ink-2); }
-.list-detail-code.on.cat-other    { background: oklch(0.82 0.005 80); color: var(--ink-2); }
+.list-detail-code.on.cat-homeroom { background: #3b82f6; }
+.list-detail-code.on.cat-advisory { background: #f59e0b; color: var(--ink); }
+.list-detail-code.on.cat-elb      { background: #14b8a6; }
+.list-detail-code.on.cat-planning { background: #c6c3c0; color: var(--ink-2); }
+.list-detail-code.on.cat-other    { background: #cac7c4; color: var(--ink-2); }
 
 .list-detail-cat {
   flex: none;
@@ -615,19 +615,19 @@ body {
  */
 
 /* Monthly strip — category pills */
-.pill.on.cat-teaching { background: oklch(0.60 0.118 158);    border-right-color: oklch(0.53 0.122 158); color: #fff; }
-.pill.on.cat-homeroom { background: oklch(0.55 0.14  260);    border-right-color: oklch(0.48 0.14  260); color: #fff; }
-.pill.on.cat-advisory { background: oklch(0.68 0.14   75);    border-right-color: oklch(0.60 0.14   70); color: #fff; }
-.pill.on.cat-elb      { background: oklch(0.56 0.12  195);    border-right-color: oklch(0.49 0.12  195); color: #fff; }
-.pill.on.cat-planning { background: oklch(0.80 0.005  80);    border-right-color: var(--line-2);         color: var(--ink-2); }
-.pill.on.cat-other    { background: oklch(0.82 0.005  80);    border-right-color: var(--line-2);         color: var(--ink-2); }
+.pill.on.cat-teaching { background: #10b981; border-right-color: #059669; color: #fff; }
+.pill.on.cat-homeroom { background: #3b82f6; border-right-color: #2563eb; color: #fff; }
+.pill.on.cat-advisory { background: #f59e0b; border-right-color: #d97706; color: #fff; }
+.pill.on.cat-elb      { background: #14b8a6; border-right-color: #0d9488; color: #fff; }
+.pill.on.cat-planning { background: #c6c3c0; border-right-color: var(--line-2); color: var(--ink-2); }
+.pill.on.cat-other    { background: #cac7c4; border-right-color: var(--line-2); color: var(--ink-2); }
 
 /* Daily view dots — category colors */
-.period-dot.teaching.cat-homeroom { background: oklch(0.55 0.14  260); }
-.period-dot.teaching.cat-advisory { background: oklch(0.68 0.14   75); color: var(--ink); }
-.period-dot.teaching.cat-elb      { background: oklch(0.56 0.12  195); }
-.period-dot.teaching.cat-planning { background: oklch(0.80 0.005  80); color: var(--ink-2); }
-.period-dot.teaching.cat-other    { background: oklch(0.82 0.005  80); color: var(--ink-2); }
+.period-dot.teaching.cat-homeroom { background: #3b82f6; }
+.period-dot.teaching.cat-advisory { background: #f59e0b; color: var(--ink); }
+.period-dot.teaching.cat-elb      { background: #14b8a6; }
+.period-dot.teaching.cat-planning { background: #c6c3c0; color: var(--ink-2); }
+.period-dot.teaching.cat-other    { background: #cac7c4; color: var(--ink-2); }
 
 /* Daily view dot expanded layout (category mode adds a subtitle line) */
 .period-dot .dot-code  { display: block; font-size: 11px; font-weight: 700; line-height: 1.2; }
@@ -652,18 +652,18 @@ body {
 }
 
 /* Legend swatches — category colors */
-.legend .swatch-on.cat-teaching { background: oklch(0.60 0.118 158); }
-.legend .swatch-on.cat-homeroom { background: oklch(0.55 0.14  260); }
-.legend .swatch-on.cat-advisory { background: oklch(0.68 0.14   75); color: var(--ink); }
-.legend .swatch-on.cat-elb      { background: oklch(0.56 0.12  195); }
-.legend .swatch-on.cat-planning { background: oklch(0.80 0.005  80); color: var(--ink-2); border: 1.5px solid var(--line-2); }
-.legend .swatch-on.cat-other    { background: oklch(0.82 0.005  80); color: var(--ink-2); border: 1.5px solid var(--line-2); }
+.legend .swatch-on.cat-teaching { background: #10b981; }
+.legend .swatch-on.cat-homeroom { background: #3b82f6; }
+.legend .swatch-on.cat-advisory { background: #f59e0b; color: var(--ink); }
+.legend .swatch-on.cat-elb      { background: #14b8a6; }
+.legend .swatch-on.cat-planning { background: #c6c3c0; color: var(--ink-2); border: 1.5px solid var(--line-2); }
+.legend .swatch-on.cat-other    { background: #cac7c4; color: var(--ink-2); border: 1.5px solid var(--line-2); }
 
 /* ---------- Import preview panel ---------- */
 
 .preview-backdrop {
   position: fixed; inset: 0;
-  background: oklch(0.27 0.012 75 / 0.5);
+  background: rgba(41,37,36,0.50);
   opacity: 0; pointer-events: none;
   transition: opacity .25s;
   z-index: 60;
@@ -765,12 +765,12 @@ body {
 .preview-cat-select:focus { outline: none; border-color: var(--accent); }
 
 /* category color tokens */
-.cat-teaching  { --cat-bg: oklch(0.96 0.030 158); --cat-border: oklch(0.75 0.09 158); --cat-ink: oklch(0.42 0.10 158); }
-.cat-homeroom  { --cat-bg: oklch(0.95 0.025 260); --cat-border: oklch(0.72 0.09 260); --cat-ink: oklch(0.40 0.11 260); }
-.cat-advisory  { --cat-bg: oklch(0.96 0.040 80);  --cat-border: oklch(0.78 0.10 80);  --cat-ink: oklch(0.45 0.10 70);  }
-.cat-elb       { --cat-bg: oklch(0.95 0.028 195); --cat-border: oklch(0.72 0.09 195); --cat-ink: oklch(0.40 0.10 195); }
-.cat-planning  { --cat-bg: oklch(0.96 0.003 80);  --cat-border: var(--line-2);         --cat-ink: var(--muted);         }
-.cat-other     { --cat-bg: oklch(0.97 0.002 80);  --cat-border: var(--line-2);         --cat-ink: var(--ink-2);         }
+.cat-teaching  { --cat-bg: #d1fae5; --cat-border: #6ee7b7; --cat-ink: #065f46; }
+.cat-homeroom  { --cat-bg: #dbeafe; --cat-border: #93c5fd; --cat-ink: #1e40af; }
+.cat-advisory  { --cat-bg: #fef3c7; --cat-border: #fcd34d; --cat-ink: #92400e; }
+.cat-elb       { --cat-bg: #ccfbf1; --cat-border: #5eead4; --cat-ink: #0f766e; }
+.cat-planning  { --cat-bg: #f5f5f4; --cat-border: var(--line-2); --cat-ink: var(--muted); }
+.cat-other     { --cat-bg: #f7f6f5; --cat-border: var(--line-2); --cat-ink: var(--ink-2); }
 
 .preview-code.cat-teaching,
 .preview-code.cat-homeroom,
@@ -818,7 +818,7 @@ body {
 .modal-backdrop {
   display: none;
   position: fixed; inset: 0;
-  background: oklch(0.27 0.012 75 / 0.45);
+  background: rgba(41,37,36,0.45);
   z-index: 300;
 }
 .modal-backdrop.open { display: block; }

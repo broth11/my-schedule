@@ -302,6 +302,37 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; 
 .pdl-free { color: #bbb; }
 `;
 
+  // ── Preflight: assert no unsupported CSS color functions ──────────────────
+
+  const UNSAFE_COLOR_RE = /oklch\(|(?:^|[^a-z])lch\(|(?:^|[^a-z])lab\(|color-mix\(/i;
+  const CHECKED_PROPS   = [
+    'color', 'backgroundColor',
+    'borderColor', 'borderTopColor', 'borderRightColor',
+    'borderBottomColor', 'borderLeftColor',
+    'boxShadow', 'textShadow',
+  ];
+
+  function assertHtml2CanvasSafeColors(root) {
+    const walk = (el) => {
+      if (el.nodeType !== 1) return; // elements only
+      const style = window.getComputedStyle(el);
+      CHECKED_PROPS.forEach(prop => {
+        const val = style[prop];
+        if (val && UNSAFE_COLOR_RE.test(val)) {
+          console.error(
+            '[pdfExport] Unsafe color detected',
+            { element: el, className: el.className, property: prop, value: val }
+          );
+          throw new Error(
+            `PDF export blocked: unsupported CSS color detected (${prop}: ${val})`
+          );
+        }
+      });
+      el.childNodes.forEach(walk);
+    };
+    walk(root);
+  }
+
   // ── Render helpers ─────────────────────────────────────────────────────────
 
   function createRenderContainer(widthPx) {
@@ -342,6 +373,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; 
       container.innerHTML = `<style>${MONTHLY_CSS}</style>${pageHTML}`;
       await waitFrames();
 
+      assertHtml2CanvasSafeColors(container);
       const canvas = await html2canvas(container, {
         scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true,
         width: renderW,
@@ -377,6 +409,7 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; 
     await waitFrames(3);
 
     // Measure each day to paginate without mid-day splits
+    assertHtml2CanvasSafeColors(container);
     const dayEls      = container.querySelectorAll('.pdl-day');
     const pageHPx     = Math.floor(pdfH * renderW / pdfW); // portrait page height in px
     const rootPadPx   = 20; // matches .pdl-root padding-top
