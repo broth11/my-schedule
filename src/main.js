@@ -50,7 +50,9 @@ if (window.pdfjsLib) {
           mergeOverlayEvents,
           filterOverlayToMonths,
       } = window.OverlayHelpers;
-      const DAY_BLOCK_ORDER = ['1', '2', '3', '4', 'FX', 'ELB', '5'];
+      const DAY_BLOCK_ORDER  = ['1', '2', '3', '4', 'FX', 'ELB', '5'];
+      // Chronological school-day position labels matching DAY_BLOCK_ORDER.
+      const PERIOD_LABELS    = ['1st', '2nd', '3rd', '4th', 'Flex', 'ELB', '5th'];
 
       function getSlotFromCode(code) {
           if (!code) return '';
@@ -955,28 +957,31 @@ if (window.pdfjsLib) {
                   detailInner = overlaySection + noteHtml;
               } else {
                   const periods = getPeriodsForDay(cycle);
-                  const detailRows = periods.map(code => {
-                      const di = getBlockDisplayInfo(code);
+                  const detailRows = periods.map((code, idx) => {
+                      const di          = getBlockDisplayInfo(code);
+                      const periodLabel = PERIOD_LABELS[idx] || di.slotLabel;
 
                       const codeClass = di.isAssigned
                           ? `list-detail-code on${dutyColorMode === 'category' ? ` cat-${di.category}` : ''}`
                           : 'list-detail-code off';
 
-                      // Title is the primary label. "Teaching" may only appear as secondary category metadata.
-                      const titleHtml = di.title
-                          ? `<span class="list-detail-title">${di.title}</span>`
-                          : '';
-                      // Show category only when there is a real imported assignment title.
-                      const hasRealTitle = di.isAssigned && scheduleAssignments[code];
-                      const catHtml = (hasRealTitle && di.categoryLabel)
-                          ? `<span class="list-detail-cat">${di.categoryLabel}</span>`
-                          : '';
+                      // Title: imported assignment when available, muted dash otherwise.
+                      const rawTitle  = scheduleAssignments[code] || '';
+                      const titleText = rawTitle || '—';
+                      const titleClass = rawTitle
+                          ? 'list-detail-title'
+                          : 'list-detail-title list-detail-title--free';
+
+                      // Room: badge when available, muted dash otherwise.
+                      const roomClass = di.room
+                          ? 'list-detail-room'
+                          : 'list-detail-room list-detail-room--free';
 
                       return `<div class="list-detail-row${di.isAssigned ? ' assigned' : ''}">
-                          <span class="${codeClass}">${di.slotLabel}</span>
-                          ${titleHtml}
-                          ${catHtml}
-                          ${di.room ? `<span class="list-detail-room">${di.room}</span>` : ''}
+                          <span class="list-detail-period">${periodLabel}</span>
+                          <span class="${titleClass}">${titleText}</span>
+                          <span class="${roomClass}">${di.room || '—'}</span>
+                          <span class="${codeClass}">${di.blockLabel}</span>
                       </div>`;
                   }).join('');
 
@@ -1037,7 +1042,10 @@ if (window.pdfjsLib) {
               elb: 'ELB', planning: 'Planning', other: 'Other'
           }[category] || category) : '';
           const room = scheduleRooms[code] || '';
-          return { code, slotLabel, isAssigned, title, category, categoryLabel, room };
+          // blockLabel: full cycle code for numeric slots (C5, A1…);
+          // "Flex" / "ELB" for those special slots so the display is readable.
+          const blockLabel = slotLabel === 'FX' ? 'Flex' : slotLabel === 'ELB' ? 'ELB' : code;
+          return { code, slotLabel, blockLabel, isAssigned, title, category, categoryLabel, room };
       }
 
       // CSS classes for a single pill in the monthly strip.

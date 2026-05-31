@@ -77,6 +77,8 @@
   const SPECIAL_CYCLES = ['HOLIDAY', 'IN-SERVICE', 'PTC', 'SONGKRAN', 'NO-SCHOOL'];
   const DAY_LETTERS    = ['A','B','C','D'];
   const NUMERIC_SLOTS  = ['1','2','3','4','5'];
+  // Chronological position labels matching DAY_BLOCK_ORDER: 1,2,3,4,FX,ELB,5.
+  const PERIOD_LABELS  = ['1st','2nd','3rd','4th','Flex','ELB','5th'];
 
   // ── Low-level jsPDF helpers ────────────────────────────────────────────────
 
@@ -452,59 +454,71 @@
       }
 
       // ── Teacher blocks ──
+      // Row layout: [period label] [title] [room badge] [block chip]
       if (cycle && !isSpecial) {
-        const dayBottom = dayY + dayH - 1.5;
-        getPeriodsForDay(cycle).forEach(code => {
-          if (curY > dayBottom) return; // stay within day bounds
-          const slot     = getSlotFromCode(code);
-          const assigned = selClasses.has(code);
-          const col      = blockColors(code, selClasses, catMap, dutyMode);
-          const cat      = assigned ? (catMap[code] || 'teaching') : null;
-          const catLbl   = cat ? (CAT_LABELS[cat] || cat) : '';
-          const title    = assignments[code] || '';
-          const room     = rooms[code]       || '';
+        const dayBottom  = dayY + dayH - 1.5;
+        const periods    = getPeriodsForDay(cycle);
+        // Divide remaining vertical space evenly; clamp to a readable range.
+        const blockRowH  = Math.max(4.5, Math.min(8.5, (dayBottom - curY) / periods.length));
+        const chipH      = blockRowH * 0.78;
+        const chipTop0   = blockRowH * 0.11; // offset from row top to chip top
+        const textOff    = blockRowH * 0.68; // offset from row top to text baseline
 
-          // Block code chip
-          const chipW = 8, chipH = 3.5;
-          fillRoundRect(doc, DL_ML, curY - 2.8, chipW, chipH, 0.5, col.bg, col.border);
-          const slotW = getTextW(doc, slot, 7, true);
-          drawText(doc, slot, DL_ML + (chipW - slotW) / 2, curY,
+        // Fixed column widths
+        const periodColW = 12; // mm — "1st"…"5th" text column
+
+        periods.forEach((code, pi) => {
+          if (curY + blockRowH > dayBottom + 0.5) return;
+
+          const rowTop    = curY;
+          const textY     = rowTop + textOff;
+          const chipTopY  = rowTop + chipTop0;
+          const periodLbl = PERIOD_LABELS[pi] || getSlotFromCode(code);
+          const slot      = getSlotFromCode(code);
+          const assigned  = selClasses.has(code);
+          const col       = blockColors(code, selClasses, catMap, dutyMode);
+          const title     = assignments[code] || '';
+          const room      = rooms[code]       || '';
+          // "Flex" / "ELB" for those slots; full cycle code (C5, A1…) for numeric slots.
+          const blockLbl  = slot === 'FX' ? 'Flex' : slot === 'ELB' ? 'ELB' : code;
+
+          // Period label — left edge
+          drawText(doc, periodLbl, DL_ML, textY,
+            { size:7.5, color: assigned ? CLR.dark : CLR.light });
+
+          const contentX = DL_ML + periodColW + 2;
+
+          // Block chip — far right
+          const bLblW  = getTextW(doc, blockLbl, 7, true);
+          const blockW = Math.max(bLblW + 5, 11);
+          const blockX = DL_W - DL_MR - blockW;
+          fillRoundRect(doc, blockX, chipTopY, blockW, chipH, 0.5, col.bg, col.border);
+          drawText(doc, blockLbl, blockX + (blockW - bLblW) / 2, textY,
             { size:7, bold:true, color:col.text });
 
-          let tx = DL_ML + chipW + 2;
-
-          // Room badge (right-aligned — drawn first to know its width for title budget)
+          // Room badge — left of block chip
           let roomBadgeW = 0;
           if (room) {
-            const rTextW   = getTextW(doc, room, 7, false);
-            roomBadgeW     = rTextW + 3;
-            const rx       = DL_W - DL_MR - roomBadgeW;
-            fillRoundRect(doc, rx, curY - 2.8, roomBadgeW, 3.5, 0.4,
+            const rTextW = getTextW(doc, room, 7, false);
+            roomBadgeW   = rTextW + 4;
+            const rx     = blockX - 2 - roomBadgeW;
+            fillRoundRect(doc, rx, chipTopY, roomBadgeW, chipH, 0.4,
               CLR.roomBg, CLR.roomBorder);
-            drawText(doc, room, rx + 1.5, curY, { size:7, color:CLR.roomText });
+            drawText(doc, room, rx + (roomBadgeW - rTextW) / 2, textY,
+              { size:7, color:CLR.roomText });
           }
 
-          // Category width budget (secondary — drawn after title)
-          const catBadgeW = catLbl ? getTextW(doc, catLbl, 7, false) + 4 : 0;
-
-          // Title (primary — bold, immediately after chip)
-          // Use assignment title when available; fall back to "Assigned" for assigned blocks.
-          const titleText = title || (assigned ? 'Assigned' : '');
-          if (titleText) {
-            const maxTW = DL_W - DL_MR - tx - catBadgeW - roomBadgeW - (room ? 3 : 0);
-            const tDisp = truncate(doc, titleText, maxTW, 7.5, true);
-            const tW    = drawText(doc, tDisp, tx, curY, { size:7.5, bold:true, color:CLR.black });
-            tx += tW + 3;
+          // Title — fills space between period column and room/block right side
+          const titleMaxX = blockX - (room ? roomBadgeW + 2 : 0) - 2;
+          const titleMaxW = titleMaxX - contentX;
+          if (title) {
+            const tDisp = truncate(doc, title, titleMaxW, 8, true);
+            drawText(doc, tDisp, contentX, textY, { size:8, bold:true, color:CLR.black });
           } else {
-            drawText(doc, '—', tx, curY, { size:7.5, color:'#cccccc' });
+            drawText(doc, '—', contentX, textY, { size:8, color:CLR.faint });
           }
 
-          // Category (secondary — muted, after title; only shown when a real assignment title exists)
-          if (catLbl && title) {
-            drawText(doc, catLbl, tx, curY, { size:7, color:CLR.catText });
-          }
-
-          curY += 3.5;
+          curY += blockRowH;
         });
       }
     });

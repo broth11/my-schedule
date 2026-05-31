@@ -42,7 +42,8 @@ function getBlockDisplayInfo(code) {
     elb: 'ELB', planning: 'Planning', other: 'Other',
   }[category] || category) : '';
   const room = scheduleRooms[code] || '';
-  return { code, slotLabel, isAssigned, title, category, categoryLabel, room };
+  const blockLabel = slotLabel === 'FX' ? 'Flex' : slotLabel === 'ELB' ? 'ELB' : code;
+  return { code, slotLabel, blockLabel, isAssigned, title, category, categoryLabel, room };
 }
 
 // ── Test runner ──────────────────────────────────────────────────────────────
@@ -64,23 +65,24 @@ function check(label, actual, expected) {
 console.log('\ngetBlockDisplayInfo — regression tests\n');
 
 const cases = [
-  { code: 'D4',    title: 'IB Math AI HL Y2',       slotLabel: '4',   catLabel: 'Teaching', room: 'H406' },
-  { code: 'D5',    title: 'Accelerated Math 9',      slotLabel: '5',   catLabel: 'Teaching', room: 'H406' },
-  { code: 'D1',    title: 'Data Science',             slotLabel: '1',   catLabel: 'Teaching', room: 'H406' },
-  { code: 'D-FX',  title: 'Advisory 10',              slotLabel: 'FX',  catLabel: 'Advisory', room: 'H406' },
-  { code: 'D-ELB', title: 'Extended Learning Block',  slotLabel: 'ELB', catLabel: 'ELB',      room: 'H406' },
+  { code: 'D4',    title: 'IB Math AI HL Y2',       slotLabel: '4',   blockLabel: 'D4',   catLabel: 'Teaching', room: 'H406' },
+  { code: 'D5',    title: 'Accelerated Math 9',      slotLabel: '5',   blockLabel: 'D5',   catLabel: 'Teaching', room: 'H406' },
+  { code: 'D1',    title: 'Data Science',             slotLabel: '1',   blockLabel: 'D1',   catLabel: 'Teaching', room: 'H406' },
+  { code: 'D-FX',  title: 'Advisory 10',              slotLabel: 'FX',  blockLabel: 'Flex', catLabel: 'Advisory', room: 'H406' },
+  { code: 'D-ELB', title: 'Extended Learning Block',  slotLabel: 'ELB', blockLabel: 'ELB',  catLabel: 'ELB',      room: 'H406' },
 ];
 
-cases.forEach(({ code, title, slotLabel, catLabel, room }) => {
+cases.forEach(({ code, title, slotLabel, blockLabel, catLabel, room }) => {
   const info = getBlockDisplayInfo(code);
   console.log(`\n  ${code}:`);
-  check(`title = "${title}"`,           info.title,         title);
-  check(`slotLabel = "${slotLabel}"`,   info.slotLabel,     slotLabel);
-  check(`isAssigned = true`,            info.isAssigned,    true);
-  check(`categoryLabel = "${catLabel}"`,info.categoryLabel, catLabel);
-  check(`room = "${room}"`,             info.room,          room);
-  check(`title is not "Teaching"`,      info.title !== 'Teaching', true);
-  check(`title is not ""`,              info.title !== '',  true);
+  check(`title = "${title}"`,               info.title,         title);
+  check(`slotLabel = "${slotLabel}"`,       info.slotLabel,     slotLabel);
+  check(`blockLabel = "${blockLabel}"`,     info.blockLabel,    blockLabel);
+  check(`isAssigned = true`,                info.isAssigned,    true);
+  check(`categoryLabel = "${catLabel}"`,    info.categoryLabel, catLabel);
+  check(`room = "${room}"`,                 info.room,          room);
+  check(`title is not "Teaching"`,          info.title !== 'Teaching', true);
+  check(`title is not ""`,                  info.title !== '',  true);
 });
 
 // Unassigned block must return empty title
