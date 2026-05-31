@@ -960,28 +960,29 @@ if (window.pdfjsLib) {
                   const detailRows = periods.map((code, idx) => {
                       const di          = getBlockDisplayInfo(code);
                       const periodLabel = PERIOD_LABELS[idx] || di.slotLabel;
+                      const isPlanning  = di.category === 'planning';
+                      const rowTitle    = di.isAssigned
+                          ? (di.title || (isPlanning ? 'Planning' : 'Assigned'))
+                          : 'Planning / Free';
+                      const rowRoom     = di.isAssigned && !isPlanning ? di.room : '';
 
                       const codeClass = di.isAssigned
                           ? `list-detail-code on${dutyColorMode === 'category' ? ` cat-${di.category}` : ''}`
                           : 'list-detail-code off';
 
-                      // Title: imported assignment when available, muted dash otherwise.
-                      const rawTitle  = scheduleAssignments[code] || '';
-                      const titleText = rawTitle || '—';
-                      const titleClass = rawTitle
+                      const titleClass = di.isAssigned
                           ? 'list-detail-title'
                           : 'list-detail-title list-detail-title--free';
 
-                      // Room: badge when available, muted dash otherwise.
-                      const roomClass = di.room
+                      const roomClass = rowRoom
                           ? 'list-detail-room'
                           : 'list-detail-room list-detail-room--free';
 
                       return `<div class="list-detail-row${di.isAssigned ? ' assigned' : ''}">
                           <span class="list-detail-period">${periodLabel}</span>
-                          <span class="${titleClass}">${titleText}</span>
-                          <span class="${roomClass}">${di.room || '—'}</span>
-                          <span class="${codeClass}">${di.blockLabel}</span>
+                          <span class="${codeClass}">${di.code}</span>
+                          <span class="${titleClass}">${rowTitle}</span>
+                          <span class="${roomClass}">${rowRoom}</span>
                       </div>`;
                   }).join('');
 
