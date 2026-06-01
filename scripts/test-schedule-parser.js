@@ -23,6 +23,11 @@ ELB(A-D) 25-26 MISC69 Extended Learning Block 28 H402 8
 5(A,C) 25-26 TECH416 IB Computer Science SL Y2 1 H402 4
 `;
 const goldingParsed = parser.parseTeacherScheduleText(goldingFixtureText);
+if (goldingParsed.teacherName !== 'Robert Michael Golding') {
+    console.error(`Expected Golding teacher name to parse as "Robert Michael Golding", got "${goldingParsed.teacherName}".`);
+    process.exitCode = 1;
+}
+
 const expandedFixtureText = `
 Teacher Schedule - Middle School Example
 Expression Term Course # Course Sec # Room Enrollment
@@ -165,6 +170,17 @@ function assertExpandedBlock(code, expected) {
 
 if (expandedParsed.primaryScheduleBlockModel !== 'ms-static-block') {
     console.error(`Expected MS block model, got ${expandedParsed.primaryScheduleBlockModel}.`);
+    process.exitCode = 1;
+}
+
+const mixedSchoolWithSb = parser.parseTeacherScheduleText(`
+Teacher Schedule - Mixed School Example
+Expression Term Course # Course Sec # Room Enrollment
+HS-Ruamrudee International School
+SB(A,C) S2 ELCP7 Computer Science 7 1 M106 16 MS-Ruamrudee International School
+`);
+if (mixedSchoolWithSb.primaryScheduleBlockModel !== 'ms-static-block') {
+    console.error(`Expected mixed-school SB schedule to use MS block model, got ${mixedSchoolWithSb.primaryScheduleBlockModel}.`);
     process.exitCode = 1;
 }
 

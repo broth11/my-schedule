@@ -21,6 +21,7 @@ if (window.pdfjsLib) {
       let useImportedData = false;
       let scheduleAssignments = {};
       let teacherBlocks = [];
+      let teacherName = '';
       let primaryScheduleBlockModel = 'hs-flex-elb';
 
       // Structured overlay events from imported ICS files, keyed by "YYYY-MM-DD".
@@ -36,6 +37,7 @@ if (window.pdfjsLib) {
           SCHEDULE_BLOCK_MODELS,
           DEFAULT_SCHEDULE_BLOCK_MODEL,
           getCoreSlots,
+          normalizeBlockCode,
           getSlotFromCode,
           getDayLetterFromCode,
           getSlotLabel,
@@ -121,8 +123,9 @@ if (window.pdfjsLib) {
       }
 
       function getBlockTooltip(code) {
-          const assignment = getDisplayTitleForBlock(code) || scheduleAssignments[code];
-          return assignment ? `${code} • ${assignment}` : code;
+          const normalizedCode = normalizeBlockCode(code);
+          const assignment = getDisplayTitleForBlock(normalizedCode);
+          return assignment ? `${normalizedCode} • ${assignment}` : normalizedCode;
       }
 
       function isValidCalendarData(data) {
@@ -201,8 +204,10 @@ if (window.pdfjsLib) {
           scheduleCategories = {};
           scheduleRooms = {};
           teacherBlocks = [];
+          teacherName = '';
           primaryScheduleBlockModel = DEFAULT_SCHEDULE_BLOCK_MODEL;
           saveSettings();
+          updateAppSubtitle();
           createClassGrid();
           updateCalendar();
           showToast('Cleared teacher blocks');
@@ -640,19 +645,38 @@ if (window.pdfjsLib) {
           const grid = document.getElementById('classGrid');
           grid.innerHTML = '';
 
-          const coreSlots = getCoreSlots(primaryScheduleBlockModel);
+          const coreSlots = getManualSelectionSlots();
+          grid.style.setProperty('--manual-slot-count', coreSlots.length);
           DAY_LETTERS.forEach(letter => {
+              const row = document.createElement('div');
+              row.className = 'manual-class-row';
+              row.dataset.day = letter;
+
               coreSlots.forEach(slot => {
                   const code = buildBlockCode(letter, slot);
+                  const normalizedCode = normalizeBlockCode(code);
                   const btn = document.createElement('button');
-                  btn.className = 'class-btn' + (selectedClasses.has(code) ? ' sel' : '');
-                  btn.textContent = formatGridLabel(code);
-                  btn.dataset.code = code;
-                  btn.onclick = () => toggleClass(code);
-                  grid.appendChild(btn);
+                  btn.className = 'class-btn' + (selectedClasses.has(normalizedCode) ? ' sel' : '');
+                  btn.textContent = formatGridLabel(normalizedCode);
+                  btn.dataset.code = normalizedCode;
+                  btn.onclick = () => toggleClass(normalizedCode);
+                  row.appendChild(btn);
               });
+
+              grid.appendChild(row);
           });
           updateCount();
+      }
+
+      function hasManualAfterSchoolSlot() {
+          return (teacherBlocks || []).some(block => getSlotFromCode(block.blockCode) === 'AS') ||
+              Array.from(selectedClasses).some(code => getSlotFromCode(code) === 'AS') ||
+              Object.keys(scheduleAssignments || {}).some(code => getSlotFromCode(code) === 'AS');
+      }
+
+      function getManualSelectionSlots() {
+          const slots = getCoreSlots(primaryScheduleBlockModel);
+          return hasManualAfterSchoolSlot() ? [...slots, 'AS'] : slots;
       }
 
       function updateCount() {
@@ -662,13 +686,14 @@ if (window.pdfjsLib) {
 
       // Toggle class selection
       function toggleClass(code) {
-          if (selectedClasses.has(code)) {
-              selectedClasses.delete(code);
+          const normalizedCode = normalizeBlockCode(code);
+          if (selectedClasses.has(normalizedCode)) {
+              selectedClasses.delete(normalizedCode);
           } else {
-              selectedClasses.add(code);
+              selectedClasses.add(normalizedCode);
           }
-          const btn = document.querySelector(`#classGrid .class-btn[data-code="${CSS.escape(code)}"]`);
-          if (btn) btn.classList.toggle('sel', selectedClasses.has(code));
+          const btn = document.querySelector(`#classGrid .class-btn[data-code="${CSS.escape(normalizedCode)}"]`);
+          if (btn) btn.classList.toggle('sel', selectedClasses.has(normalizedCode));
           updateCount();
           saveSettings();
           updateCalendar();
@@ -677,6 +702,10 @@ if (window.pdfjsLib) {
       function hasAfterSchoolForCycle(cycleCode) {
           const letter = getDayLetterFromCycle(cycleCode);
           return Boolean(letter) && getAssignmentsForBlock(buildBlockCode(letter, 'AS'), cycleCode).length > 0;
+      }
+
+      function isBlockActive(code) {
+          return selectedClasses.has(normalizeBlockCode(code));
       }
 
       function getScheduleEntriesForDay(cycleCode) {
@@ -759,7 +788,9 @@ if (window.pdfjsLib) {
           if (dutyColorMode === 'category') {
               // Only show categories that have at least one assigned block.
               const usedCats = new Set(
-                  (teacherBlocks.length ? teacherBlocks.filter(isBlockSelected).map(block => block.category || 'teaching') : Array.from(selectedClasses).map(code => getBlockCategory(code) || 'teaching'))
+                  (teacherBlocks.length
+                      ? teacherBlocks.filter(block => isBlockActive(block.blockCode)).map(block => block.category || 'teaching')
+                      : Array.from(selectedClasses).map(code => getBlockCategory(code) || 'teaching'))
               );
               const catSwatches = CATEGORY_META
                   .filter(m => usedCats.has(m.cat))
@@ -1033,12 +1064,9 @@ if (window.pdfjsLib) {
       // Return the category for a block code, falling back to 'teaching' for
       // assigned blocks with no recorded category (manually toggled via the grid).
       function getBlockCategory(code, cycleCode = null) {
-          const assignment = getAssignmentsForBlock(code, cycleCode)[0];
-          return assignment?.category || scheduleCategories[code] || (selectedClasses.has(code) ? 'teaching' : null);
-      }
-
-      function isBlockSelected(block) {
-          return block && block.selected !== false;
+          const normalizedCode = normalizeBlockCode(code);
+          const assignment = getAssignmentsForBlock(normalizedCode, cycleCode)[0];
+          return assignment?.category || scheduleCategories[normalizedCode] || (isBlockActive(normalizedCode) ? 'teaching' : null);
       }
 
       function cycleMatchesBlock(block, cycleCode) {
@@ -1047,24 +1075,26 @@ if (window.pdfjsLib) {
       }
 
       function getAssignmentsForBlock(code, cycleCode = null) {
+          const normalizedCode = normalizeBlockCode(code);
+          if (!isBlockActive(normalizedCode)) return [];
+
           const normalizedBlocks = (teacherBlocks || []).filter(block =>
-              block.blockCode === code &&
-              isBlockSelected(block) &&
+              normalizeBlockCode(block.blockCode) === normalizedCode &&
               (!cycleCode || cycleMatchesBlock(block, cycleCode))
           );
 
           if (normalizedBlocks.length) return normalizedBlocks;
 
-          const value = scheduleAssignments[code];
+          const value = scheduleAssignments[normalizedCode];
           const titles = Array.isArray(value) ? value : (value ? [value] : []);
           return titles.map(title => ({
-              blockCode: code,
+              blockCode: normalizedCode,
               title,
-              room: scheduleRooms[code] || null,
-              category: scheduleCategories[code] || 'teaching',
-              selected: selectedClasses.has(code),
+              room: scheduleRooms[normalizedCode] || null,
+              category: scheduleCategories[normalizedCode] || 'teaching',
+              selected: true,
               cycleDayConstraints: []
-          })).filter(block => block.selected);
+          }));
       }
 
       function getDisplayTitleForBlock(code, cycleCode = null) {
@@ -1081,28 +1111,30 @@ if (window.pdfjsLib) {
       // no imported title; "" when not assigned.
       // "Teaching" may appear only in categoryLabel — never as the primary title.
       function getBlockDisplayInfo(code) {
-          const slotLabel  = getSlotFromCode(code);
-          const assignmentsForBlock = getAssignmentsForBlock(code);
-          const isAssigned = selectedClasses.has(code) || assignmentsForBlock.length > 0;
-          const rawTitle   = assignmentsForBlock.length ? assignmentsForBlock.map(block => block.title).filter(Boolean).join(' / ') : (scheduleAssignments[code] || '');
+          const normalizedCode = normalizeBlockCode(code);
+          const slotLabel  = getSlotFromCode(normalizedCode);
+          const assignmentsForBlock = getAssignmentsForBlock(normalizedCode);
+          const isAssigned = isBlockActive(normalizedCode);
+          const rawTitle   = assignmentsForBlock.length ? assignmentsForBlock.map(block => block.title).filter(Boolean).join(' / ') : '';
           const title      = isAssigned ? (rawTitle || 'Assigned') : '';
-          const category   = isAssigned ? (assignmentsForBlock[0]?.category || scheduleCategories[code] || 'teaching') : null;
+          const category   = isAssigned ? (assignmentsForBlock[0]?.category || scheduleCategories[normalizedCode] || 'teaching') : null;
           const categoryLabel = category ? ({
               teaching: 'Teaching', homeroom: 'Homeroom', advisory: 'Advisory',
               elb: 'ELB', planning: 'Planning', meeting: 'Meeting',
               coverage: 'Coverage', 'after-school': 'After School', other: 'Other'
           }[category] || category) : '';
-          const room = assignmentsForBlock.length ? getDisplayRoomForBlock(code) : (scheduleRooms[code] || '');
+          const room = assignmentsForBlock.length ? getDisplayRoomForBlock(normalizedCode) : '';
           const blockLabel = getSlotLabel(slotLabel, 'expanded');
-          return { code, slotLabel, blockLabel, isAssigned, title, category, categoryLabel, room };
+          return { code: normalizedCode, slotLabel, blockLabel, isAssigned, title, category, categoryLabel, room };
       }
 
       // CSS classes for a single pill in the monthly strip.
       function getPillClass(code, cycleCode = null) {
-          const on = selectedClasses.has(code) || getAssignmentsForBlock(code, cycleCode).length > 0;
+          const normalizedCode = normalizeBlockCode(code);
+          const on = isBlockActive(normalizedCode);
           if (!on) return 'pill';
           if (dutyColorMode === 'category') {
-              return `pill on cat-${getBlockCategory(code, cycleCode) || 'teaching'}`;
+              return `pill on cat-${getBlockCategory(normalizedCode, cycleCode) || 'teaching'}`;
           }
           return 'pill on';
       }
@@ -1114,7 +1146,7 @@ if (window.pdfjsLib) {
           const periods = getPeriodsForDay(cycleCode);
 
           return periods.map(p => {
-              const isAssigned = selectedClasses.has(p) || getAssignmentsForBlock(p, cycleCode).length > 0;
+              const isAssigned = isBlockActive(p);
               const label      = formatInlinePeriodLabel(p);
               const tooltip    = getBlockTooltip(p);
 
@@ -1148,19 +1180,23 @@ if (window.pdfjsLib) {
 
           let pills;
           let teachCount = 0;
+          let periodCount = 0;
 
           if (isSpecial) {
-              pills = getCoreSlots(primaryScheduleBlockModel).map(slot => `<div class="pill">${getSlotLabel(slot, 'compact')}</div>`).join('');
+              const slots = getCoreSlots(primaryScheduleBlockModel);
+              periodCount = slots.length;
+              pills = slots.map(slot => `<div class="pill">${getSlotLabel(slot, 'compact')}</div>`).join('');
           } else {
               const periods = getPeriodsForDay(cycleCode);
-              teachCount = periods.filter(p => getAssignmentsForBlock(p, cycleCode).length || selectedClasses.has(p)).length;
+              periodCount = periods.length;
+              teachCount = periods.filter(p => isBlockActive(p)).length;
               pills = periods.map(p => {
                   const label = getSlotFromCode(p);
                   return `<div class="${getPillClass(p, cycleCode)}" title="${getBlockTooltip(p)}">${label}</div>`;
               }).join('');
           }
 
-          return `<div class="periods${teachCount === 0 && !isSpecial ? ' none' : ''}">${pills}</div>`;
+          return `<div class="periods${teachCount === 0 && !isSpecial ? ' none' : ''}" style="--period-count:${periodCount}">${pills}</div>`;
       }
 
       // ── Schedule view mode ──────────────────────────────────────────────
@@ -1198,6 +1234,28 @@ if (window.pdfjsLib) {
           });
       }
 
+      function updateAppSubtitle() {
+          const subtitle = document.getElementById('appSubtitle');
+          if (!subtitle) return;
+          subtitle.textContent = teacherName || 'RIS Cycle Day Calendar';
+      }
+
+      function normalizeBlockCodeMap(map) {
+          return Object.entries(map || {}).reduce((normalized, [code, value]) => {
+              const normalizedCode = normalizeBlockCode(code);
+              if (normalizedCode) normalized[normalizedCode] = value;
+              return normalized;
+          }, {});
+      }
+
+      function normalizeTeacherBlocks(blocks) {
+          return (blocks || []).map(block => ({
+              ...block,
+              blockCode: normalizeBlockCode(block.blockCode),
+              displayBlockCode: block.displayBlockCode || normalizeBlockCode(block.blockCode)
+          }));
+      }
+
       function setDutyColorMode(mode) {
           dutyColorMode = mode === 'category' ? 'category' : 'single';
           refreshDutyColorControl();
@@ -1222,6 +1280,7 @@ if (window.pdfjsLib) {
 
       let pendingPreviewRows = [];
       let pendingPreviewModel = DEFAULT_SCHEDULE_BLOCK_MODEL;
+      let pendingPreviewTeacherName = '';
 
       function openPreviewPanel() {
           document.getElementById('previewBackdrop').classList.add('open');
@@ -1233,6 +1292,7 @@ if (window.pdfjsLib) {
           document.getElementById('importPreviewPanel').classList.remove('open');
           pendingPreviewRows = [];
           pendingPreviewModel = DEFAULT_SCHEDULE_BLOCK_MODEL;
+          pendingPreviewTeacherName = '';
       }
 
       function applyImportPreview() {
@@ -1243,24 +1303,26 @@ if (window.pdfjsLib) {
           const newTeacherBlocks    = [];
 
           pendingPreviewRows.forEach(row => {
+              const blockCode = normalizeBlockCode(row.blockCode);
               const block = {
                   ...row,
+                  blockCode,
                   selected: row.included,
                   room: row.room || null
               };
               newTeacherBlocks.push(block);
               if (row.included) {
-                  newSelectedClasses.add(row.blockCode);
-                  newCategories[row.blockCode] = row.category;
-                  if (row.room) newRooms[row.blockCode] = row.room;
+                  newSelectedClasses.add(blockCode);
+                  newCategories[blockCode] = row.category;
+                  if (row.room) newRooms[blockCode] = row.room;
                   if (row.title) {
-                      const current = newAssignments[row.blockCode];
+                      const current = newAssignments[blockCode];
                       if (Array.isArray(current)) {
                           if (!current.includes(row.title)) current.push(row.title);
                       } else if (current && current !== row.title) {
-                          newAssignments[row.blockCode] = [current, row.title];
+                          newAssignments[blockCode] = [current, row.title];
                       } else if (!current) {
-                          newAssignments[row.blockCode] = row.title;
+                          newAssignments[blockCode] = row.title;
                       }
                   }
               }
@@ -1271,9 +1333,11 @@ if (window.pdfjsLib) {
           scheduleCategories   = newCategories;
           scheduleRooms        = newRooms;
           teacherBlocks        = newTeacherBlocks;
+          teacherName          = pendingPreviewTeacherName;
           primaryScheduleBlockModel = pendingPreviewModel;
 
           saveSettings();
+          updateAppSubtitle();
           createClassGrid();
           updateCalendar();
           closePreviewPanel();
@@ -1310,8 +1374,8 @@ if (window.pdfjsLib) {
           });
 
           return all.map(block => ({
-              blockCode:  block.blockCode,
-              displayBlockCode: block.displayBlockCode || block.blockCode,
+              blockCode:  normalizeBlockCode(block.blockCode),
+              displayBlockCode: block.displayBlockCode || normalizeBlockCode(block.blockCode),
               dayLetter: block.dayLetter || getDayLetterFromCode(block.blockCode),
               slot: block.slot || getSlotFromCode(block.blockCode),
               rawSlot: block.rawSlot || block.slot || getSlotFromCode(block.blockCode),
@@ -1401,6 +1465,7 @@ if (window.pdfjsLib) {
       function showImportPreview(parsed) {
           pendingPreviewRows = _buildPreviewRows(parsed);
           pendingPreviewModel = parsed.primaryScheduleBlockModel || DEFAULT_SCHEDULE_BLOCK_MODEL;
+          pendingPreviewTeacherName = parsed.teacherName || '';
           _renderPreviewTableBody();
           _updatePreviewCounts();
           openPreviewPanel();
@@ -1558,6 +1623,7 @@ if (window.pdfjsLib) {
               scheduleCategories,
               scheduleRooms,
               teacherBlocks,
+              teacherName,
               primaryScheduleBlockModel,
               dutyColorMode,
               scheduleViewMode
@@ -1568,14 +1634,16 @@ if (window.pdfjsLib) {
           migrateStoredStateIfNeeded();
 
           const settings = loadTeacherScheduleSettings();
-          selectedClasses     = new Set(settings.selectedClasses || []);
-          scheduleAssignments = settings.scheduleAssignments || {};
-          scheduleCategories  = settings.scheduleCategories  || {};
-          scheduleRooms       = settings.scheduleRooms       || {};
-          teacherBlocks       = settings.teacherBlocks       || [];
+          selectedClasses     = new Set((settings.selectedClasses || []).map(normalizeBlockCode).filter(Boolean));
+          scheduleAssignments = normalizeBlockCodeMap(settings.scheduleAssignments);
+          scheduleCategories  = normalizeBlockCodeMap(settings.scheduleCategories);
+          scheduleRooms       = normalizeBlockCodeMap(settings.scheduleRooms);
+          teacherBlocks       = normalizeTeacherBlocks(settings.teacherBlocks);
+          teacherName         = settings.teacherName         || '';
           primaryScheduleBlockModel = settings.primaryScheduleBlockModel || DEFAULT_SCHEDULE_BLOCK_MODEL;
           dutyColorMode       = settings.dutyColorMode       || 'single';
           scheduleViewMode    = settings.scheduleViewMode    || 'auto';
+          updateAppSubtitle();
 
           const importedCalendarState = loadImportedCalendarState();
           if (importedCalendarState.useImportedData && Object.keys(importedCalendarState.importedCalendarData).length > 0) {

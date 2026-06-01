@@ -84,6 +84,7 @@
     DEFAULT_SCHEDULE_BLOCK_MODEL,
     getCoreSlots,
     buildBlockCode,
+    normalizeBlockCode,
     getSlotFromCode,
     getSlotLabel,
     getScheduleEntriesForCycle,
@@ -164,24 +165,26 @@
     return DAY_LETTERS.includes(l) ? l : null;
   }
   function getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses) {
+    const normalizedCode = normalizeBlockCode(code);
+    if (!selClasses.has(normalizedCode)) return [];
+
     const blocks = (teacherBlocks || []).filter(block => {
       const constraints = block.cycleDayConstraints || [];
-      return block.blockCode === code &&
-        block.selected !== false &&
+      return normalizeBlockCode(block.blockCode) === normalizedCode &&
         (!cycle || constraints.length === 0 || constraints.includes(cycle));
     });
     if (blocks.length) return blocks;
 
-    const value = assignments[code];
+    const value = assignments[normalizedCode];
     const titles = Array.isArray(value) ? value : (value ? [value] : []);
     return titles.map(title => ({
-      blockCode: code,
+      blockCode: normalizedCode,
       title,
-      room: rooms[code] || null,
-      category: catMap[code] || 'teaching',
-      selected: selClasses.has(code),
+      room: rooms[normalizedCode] || null,
+      category: catMap[normalizedCode] || 'teaching',
+      selected: true,
       cycleDayConstraints: []
-    })).filter(block => block.selected);
+    }));
   }
   function getScheduleEntriesForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses) {
     const letter = getDayLetter(cycle);
@@ -194,10 +197,11 @@
     return getScheduleEntriesForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses).map(entry => entry.blockCode);
   }
   function blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms) {
+    const normalizedCode = normalizeBlockCode(code);
     const blocks = getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses);
-    if (!selClasses.has(code) && blocks.length === 0) return { bg: CLR.freeBg, text: CLR.freeText, border: CLR.freeBorder };
+    if (!selClasses.has(normalizedCode)) return { bg: CLR.freeBg, text: CLR.freeText, border: CLR.freeBorder };
     if (dutyMode === 'category') {
-      const cat = blocks[0]?.category || catMap[code] || 'teaching';
+      const cat = blocks[0]?.category || catMap[normalizedCode] || 'teaching';
       return CAT_COLORS[cat] || CAT_COLORS.teaching;
     }
     return { bg: CLR.dutyBg, text: CLR.dutyText, border: CLR.dutyBorder };
@@ -500,7 +504,7 @@
           const slot      = getSlotFromCode(code);
           const periodLbl = entry.periodLabel;
           const blocks    = getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses);
-          const assigned  = selClasses.has(code) || blocks.length > 0;
+          const assigned  = selClasses.has(normalizeBlockCode(code));
           const col       = blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms);
           const title     = blocks.map(block => block.title).filter(Boolean).join(' / ');
           const roomSet   = Array.from(new Set(blocks.map(block => block.room).filter(Boolean)));

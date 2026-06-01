@@ -33,6 +33,11 @@ function main() {
         `Compact labels mismatch: ${summarize(compact)}`
     );
 
+    assert(model.normalizeBlockCode('A ELB') === 'A-ELB', 'A ELB should normalize to A-ELB.');
+    assert(model.normalizeBlockCode('aelb') === 'A-ELB', 'aelb should normalize to A-ELB.');
+    assert(model.normalizeBlockCode('A-ELB') === 'A-ELB', 'A-ELB should remain canonical.');
+    assert(model.normalizeBlockCode('a 5') === 'A5', 'a 5 should normalize to A5.');
+
     console.log('Block model structure tests passed');
 }
 

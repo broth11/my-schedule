@@ -64,6 +64,18 @@
         return 'unknown';
     }
 
+    function extractTeacherName(rawText) {
+        const normalized = normalizeTeacherScheduleText(rawText);
+        const match = normalized.match(/\bTeacher Schedule\s*-\s*([^0-9]+?)\s*(?:\d{3,}|\bExpression\b|\bTerm\b|$)/i);
+        if (!match) return '';
+        const rawName = match[1].replace(/\s+/g, ' ').trim();
+        const parts = rawName.split(',').map(part => part.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+            return `${parts.slice(1).join(' ')} ${parts[0]}`.replace(/\s+/g, ' ').trim();
+        }
+        return rawName;
+    }
+
     function extractCourseName(rowText) {
         return extractBlockMetadata(rowText, rowText, '').title;
     }
@@ -378,6 +390,7 @@
     function parseTeacherScheduleText(rawText) {
         const normalized = normalizeTeacherScheduleText(rawText);
         const format = detectSchedulePdfFormat(rawText);
+        const teacherName = extractTeacherName(rawText);
         let parsedRows = [];
         if (format === 'admin-table') {
             const listRows = parseListScheduleRows(normalized);
@@ -385,6 +398,7 @@
                 parsedRows = listRows;
                 return {
                     ...buildParseResult(format, parsedRows),
+                    teacherName,
                     primaryScheduleBlockModel: detectPrimaryScheduleBlockModel(normalized, parsedRows)
                 };
             }
@@ -427,6 +441,7 @@
 
         return {
             ...buildParseResult(format, parsedRows),
+            teacherName,
             primaryScheduleBlockModel: detectPrimaryScheduleBlockModel(normalized, parsedRows)
         };
     }
@@ -438,6 +453,7 @@
         expandDaySpec,
         normalizeTeacherScheduleText,
         detectSchedulePdfFormat,
+        extractTeacherName,
         extractCourseName,
         extractRoom,
         classifyBlock,

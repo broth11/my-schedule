@@ -42,14 +42,25 @@
             : `${day}${normalizedSlot}`;
     }
 
+    function normalizeBlockCode(code) {
+        return String(code || '')
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, '-')
+            .replace(/^([A-D])(?:-)?(HR|FX|ELB|SB|AS|ADV|FXB)$/i, '$1-$2')
+            .replace(/^([A-D])(?:-)?([1-5])$/i, '$1$2');
+    }
+
     function getSlotFromCode(code) {
-        if (!code) return '';
-        return String(code).includes('-') ? String(code).split('-')[1] : String(code).slice(1);
+        const normalizedCode = normalizeBlockCode(code);
+        if (!normalizedCode) return '';
+        return normalizedCode.includes('-') ? normalizedCode.split('-')[1] : normalizedCode.slice(1);
     }
 
     function getDayLetterFromCode(code) {
-        if (!code) return '';
-        return String(code).charAt(0).toUpperCase();
+        const normalizedCode = normalizeBlockCode(code);
+        if (!normalizedCode) return '';
+        return normalizedCode.charAt(0).toUpperCase();
     }
 
     function getSlotLabel(slot, context = 'compact') {
@@ -73,11 +84,11 @@
 
     function detectPrimaryScheduleBlockModel(text, parsedRows = []) {
         const source = text || '';
+        if ((parsedRows || []).some(row => row.slot === 'SB')) return 'ms-static-block';
         const schoolMatch = source.match(/\b(?:MS|HS)-Ruamrudee International School\b/i);
         if (schoolMatch) {
             return /^MS-/i.test(schoolMatch[0]) ? 'ms-static-block' : 'hs-flex-elb';
         }
-        if ((parsedRows || []).some(row => row.slot === 'SB')) return 'ms-static-block';
         return DEFAULT_SCHEDULE_BLOCK_MODEL;
     }
 
@@ -161,6 +172,7 @@
         normalizeModelId,
         getCoreSlots,
         buildBlockCode,
+        normalizeBlockCode,
         getSlotFromCode,
         getDayLetterFromCode,
         getSlotLabel,

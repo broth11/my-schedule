@@ -43,6 +43,7 @@ function runEmptyStateTest() {
     assertDeepEqual(settings.selectedClasses, [], 'Empty storage should load no selected classes.');
     assertDeepEqual(settings.scheduleAssignments, {}, 'Empty storage should load no schedule assignments.');
     assertDeepEqual(settings.teacherBlocks, [], 'Empty storage should load no teacher blocks.');
+    assert(settings.teacherName === '', 'Empty storage should load no teacher name.');
     assert(settings.primaryScheduleBlockModel === 'hs-flex-elb', 'Empty storage should default to HS block model.');
     assert(settings.theme === 'light', 'Empty storage should default to light theme.');
     assert(imported.useImportedData === false, 'Empty storage should not enable imported calendar data.');
@@ -58,6 +59,7 @@ function runSaveLoadTeacherScheduleTest() {
         scheduleAssignments: { A2: 'IB Math AI HL Y1' },
         scheduleCategories: { A2: 'teaching' },
         teacherBlocks: [{ blockCode: 'A2', title: 'IB Math AI HL Y1', room: 'H406', category: 'teaching', selected: true }],
+        teacherName: 'Robert Michael Golding',
         primaryScheduleBlockModel: 'ms-static-block',
         theme: 'dark',
         teachingColor: '#123456',
@@ -74,6 +76,7 @@ function runSaveLoadTeacherScheduleTest() {
     assert(settings.scheduleAssignments.A2 === 'IB Math AI HL Y1', 'Saved assignment should load.');
     assert(settings.scheduleCategories.A2 === 'teaching', 'Saved category should load.');
     assert(settings.teacherBlocks[0].blockCode === 'A2', 'Saved teacher blocks should load.');
+    assert(settings.teacherName === 'Robert Michael Golding', 'Saved teacher name should load.');
     assert(settings.primaryScheduleBlockModel === 'ms-static-block', 'Saved block model should load.');
     assert(settings.theme === 'dark', 'Saved theme should load.');
     assert(settings.teachingColor === '#123456', 'Saved teaching color should load.');
