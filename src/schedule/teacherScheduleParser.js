@@ -102,6 +102,13 @@
         return cleaned;
     }
 
+    function normalizeListTitle(text) {
+        return (text || '')
+            .replace(/\b(?:locked|lock|attendance)\b/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
     function classifyBlock(slot, title, isNonTeaching) {
         if (isNonTeaching || /common planning time|planning time/i.test(title)) return 'planning';
         if (slot === 'HR' || /homeroom/i.test(title)) return 'homeroom';
@@ -134,16 +141,66 @@
         };
     }
 
-    function parseTeacherScheduleText(rawText) {
-        const normalized = normalizeTeacherScheduleText(rawText);
-        const format = detectSchedulePdfFormat(rawText);
-        const expressionRegex = /\b(HR|ELB|FX|[1-5])\(([A-D,\-\s]+)\)/g;
-        const matches = Array.from(normalized.matchAll(expressionRegex));
+    const LIST_EXPRESSION_REGEX = /\b(?:HR|ELB|FX|[1-5])\([A-D,\-\s]+\)/gi;
+    const LIST_ROW_PREFIX_REGEX = /^(?<expression>(?:HR|ELB|FX|[1-5])\([A-D,\-\s]+\))\s+(?<term>(?:\d{2}-\d{2}|S[12]))\s+(?<courseCode>[A-Z]+\d+)\s+(?<details>.+)$/i;
+    const LIST_ROOM_TOKEN_REGEX = /^(?:[A-Z]\d{3}|\d{1,2}-\d+|[A-Z]+\d+|TBD|Room:\s*\S+)$/i;
+    const LIST_SECTION_TOKEN_REGEX = /^\d+[A-Z]?$/i;
+    const LIST_ENROLLMENT_TOKEN_REGEX = /^\d+\/\d+$|^\d+$/;
 
-        if (!matches.length) {
-            throw new Error('No schedule expressions like 3(A,C-D) were found in the PDF.');
-        }
+    function parseListScheduleRows(normalizedText) {
+        const expressionMatches = Array.from(normalizedText.matchAll(LIST_EXPRESSION_REGEX));
 
+        return expressionMatches.map((rowExpressionMatch, index) => {
+            const rowStart = rowExpressionMatch.index;
+            const rowEnd = index < expressionMatches.length - 1
+                ? expressionMatches[index + 1].index
+                : normalizedText.length;
+            const sourceText = normalizedText.slice(rowStart, rowEnd)
+                .replace(/\bMake all students listed above.*$/i, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            const match = sourceText.match(LIST_ROW_PREFIX_REGEX);
+            if (!match) return null;
+
+            const groups = match.groups || {};
+            const parsedExpression = (groups.expression || '').match(/^(HR|ELB|FX|[1-5])\(([A-D,\-\s]+)\)$/i);
+            const slot = parsedExpression ? parsedExpression[1].toUpperCase() : '';
+            const daySpec = parsedExpression ? parsedExpression[2] : '';
+            const detailTokens = (groups.details || '').trim().split(/\s+/).filter(Boolean);
+            let enrollment = '';
+            let room = '';
+            let section = '';
+
+            if (detailTokens.length && LIST_ENROLLMENT_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
+                enrollment = detailTokens.pop();
+            }
+            if (detailTokens.length && LIST_ROOM_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
+                room = detailTokens.pop().replace(/^Room:\s*/i, '').toUpperCase();
+            }
+            if (detailTokens.length && LIST_SECTION_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
+                section = detailTokens.pop();
+            }
+
+            const title = normalizeListTitle(detailTokens.join(' '));
+            const isNonTeaching = NON_TEACHING_PATTERNS.some(pattern => pattern.test(title));
+
+            return {
+                expression: groups.expression || '',
+                slot,
+                daySpec,
+                term: groups.term || '',
+                courseCode: groups.courseCode || '',
+                title,
+                section,
+                room,
+                enrollment,
+                category: classifyBlock(slot, title, isNonTeaching),
+                sourceText
+            };
+        }).filter(row => row && row.expression && row.slot && row.daySpec && row.title);
+    }
+
+    function buildParseResult(format, parsedRows) {
         const selectedCodes = new Set();
         const assignments = {};
         const blockMap = new Map();
@@ -151,34 +208,24 @@
         const warnings = [];
         let ignoredPlanningBlocks = 0;
 
-        matches.forEach((match, index) => {
-            const slot = match[1].toUpperCase();
-            const daySpec = match[2];
-            const expressionText = match[0];
-            const previousMatchEnd = index > 0 ? matches[index - 1].index + matches[index - 1][0].length : 0;
-            const rowStart = match.index;
-            const rowEnd = index < matches.length - 1 ? matches[index + 1].index : normalized.length;
-            const rowText = normalized.slice(rowStart, rowEnd).trim();
-            const contextText = format === 'admin-table' ? rowText : normalized.slice(previousMatchEnd, rowEnd).trim();
-            const metadata = extractBlockMetadata(rowText, contextText, expressionText);
-            const isNonTeaching = NON_TEACHING_PATTERNS.some(pattern => pattern.test(metadata.title));
-            const category = classifyBlock(slot, metadata.title, isNonTeaching);
-            const days = expandDaySpec(daySpec);
+        parsedRows.forEach(row => {
+            const days = expandDaySpec(row.daySpec);
 
             days.forEach(day => {
-                const code = buildBlockCode(day, slot);
+                const code = buildBlockCode(day, row.slot);
                 const blockMetadata = {
                     blockCode: code,
-                    category,
-                    title: metadata.title,
-                    room: metadata.room,
-                    sourceText: contextText
+                    category: row.category,
+                    title: row.title,
+                    room: row.room,
+                    section: row.section || '',
+                    sourceText: row.sourceText
                 };
 
-                if (category !== 'planning') {
+                if (row.category !== 'planning') {
                     selectedCodes.add(code);
-                    if (metadata.title && !assignments[code]) {
-                        assignments[code] = metadata.title;
+                    if (row.title && !assignments[code]) {
+                        assignments[code] = row.title;
                     }
                     if (!blockMap.has(code)) {
                         blockMap.set(code, blockMetadata);
@@ -199,30 +246,66 @@
             blocks: Array.from(blockMap.values()),
             ignoredBlocks: Array.from(ignoredBlockMap.values()),
             ignoredPlanningBlocks,
-            expressionCount: matches.length,
-            rawMatches: matches.map((match, index) => {
-                const slot = match[1].toUpperCase();
-                const daySpec = match[2];
-                const expressionText = match[0];
-                const previousMatchEnd = index > 0 ? matches[index - 1].index + matches[index - 1][0].length : 0;
-                const rowStart = match.index;
-                const rowEnd = index < matches.length - 1 ? matches[index + 1].index : normalized.length;
-                const rowText = normalized.slice(rowStart, rowEnd).trim();
-                const contextText = format === 'admin-table' ? rowText : normalized.slice(previousMatchEnd, rowEnd).trim();
-                const metadata = extractBlockMetadata(rowText, contextText, expressionText);
-                const isNonTeaching = NON_TEACHING_PATTERNS.some(pattern => pattern.test(metadata.title));
-                return {
-                    expression: expressionText,
-                    slot,
-                    daySpec,
-                    title: metadata.title,
-                    room: metadata.room,
-                    category: classifyBlock(slot, metadata.title, isNonTeaching),
-                    sourceText: contextText
-                };
-            }),
+            expressionCount: parsedRows.length,
+            rawMatches: parsedRows.map(row => ({
+                expression: row.expression,
+                slot: row.slot,
+                daySpec: row.daySpec,
+                term: row.term || '',
+                courseCode: row.courseCode || '',
+                title: row.title,
+                section: row.section || '',
+                room: row.room,
+                enrollment: row.enrollment || '',
+                category: row.category,
+                sourceText: row.sourceText
+            })),
             warnings
         };
+    }
+
+    function parseTeacherScheduleText(rawText) {
+        const normalized = normalizeTeacherScheduleText(rawText);
+        const format = detectSchedulePdfFormat(rawText);
+        if (format === 'admin-table') {
+            const listRows = parseListScheduleRows(normalized);
+            if (listRows.length) {
+                return buildParseResult(format, listRows);
+            }
+        }
+
+        const expressionRegex = /\b(HR|ELB|FX|[1-5])\(([A-D,\-\s]+)\)/g;
+        const matches = Array.from(normalized.matchAll(expressionRegex));
+
+        if (!matches.length) {
+            throw new Error('No schedule expressions like 3(A,C-D) were found in the PDF.');
+        }
+
+        const parsedRows = matches.map((match, index) => {
+            const slot = match[1].toUpperCase();
+            const daySpec = match[2];
+            const expressionText = match[0];
+            const previousMatchEnd = index > 0 ? matches[index - 1].index + matches[index - 1][0].length : 0;
+            const rowStart = match.index;
+            const rowEnd = index < matches.length - 1 ? matches[index + 1].index : normalized.length;
+            const rowText = normalized.slice(rowStart, rowEnd).trim();
+            const contextText = format === 'admin-table' ? rowText : normalized.slice(previousMatchEnd, rowEnd).trim();
+            const metadata = extractBlockMetadata(rowText, contextText, expressionText);
+            const isNonTeaching = NON_TEACHING_PATTERNS.some(pattern => pattern.test(metadata.title));
+            const category = classifyBlock(slot, metadata.title, isNonTeaching);
+
+            return {
+                expression: expressionText,
+                slot,
+                daySpec,
+                title: metadata.title,
+                room: metadata.room,
+                category,
+                sourceText: contextText
+            };
+        });
+
+        return buildParseResult(format, parsedRows);
     }
 
     return {
@@ -236,6 +319,7 @@
         extractRoom,
         classifyBlock,
         extractBlockMetadata,
+        parseListScheduleRows,
         parseTeacherScheduleText
     };
 });
