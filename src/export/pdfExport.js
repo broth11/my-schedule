@@ -318,7 +318,7 @@
 
         if (isSpecial) {
           // Special tag badge below date
-          curY += 5.5;
+          curY += 7;
           const tagW = getTextW(doc, cycle, 6.5, true) + 3;
           fillRoundRect(doc, cx + pad, curY - 2.2, tagW, 3.8, 0.5,
             CLR.spTagBg, CLR.spTagBorder);
