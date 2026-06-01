@@ -105,6 +105,10 @@
     function normalizeListTitle(text) {
         return (text || '')
             .replace(/\b(?:locked|lock|attendance)\b/gi, ' ')
+            .replace(/\bNo terms for this section are locked\b/gi, ' ')
+            .replace(/\b(?:HS|MS)-Ruamrudee International School\b/gi, ' ')
+            .replace(/\bLegend\b/gi, ' ')
+            .replace(/\bIcons\b/gi, ' ')
             .replace(/\s+/g, ' ')
             .trim();
     }
@@ -142,62 +146,114 @@
     }
 
     const LIST_EXPRESSION_REGEX = /\b(?:HR|ELB|FX|[1-5])\([A-D,\-\s]+\)/gi;
-    const LIST_ROW_PREFIX_REGEX = /^(?<expression>(?:HR|ELB|FX|[1-5])\([A-D,\-\s]+\))\s+(?<term>(?:\d{2}-\d{2}|S[12]))\s+(?<courseCode>[A-Z]+\d+)\s+(?<details>.+)$/i;
+    const LIST_ROW_PREFIX_REGEX = /^(?<expression>(?:HR|ELB|FX|[1-5])\([A-D,\-\s]+\))\s+(?<term>(?:\d{2}-\d{2}|S[12]))\s+(?<courseCode>[A-Z]+\d+[A-Z0-9]*)\s+(?<details>.+)$/i;
     const LIST_ROOM_TOKEN_REGEX = /^(?:[A-Z]\d{3}|\d{1,2}-\d+|[A-Z]+\d+|TBD|Room:\s*\S+)$/i;
     const LIST_SECTION_TOKEN_REGEX = /^\d+[A-Z]?$/i;
     const LIST_ENROLLMENT_TOKEN_REGEX = /^\d+\/\d+$|^\d+$/;
 
+    const BARE_EXPRESSION_REGEX = /^(?:HR|ELB|FX|[1-5])\([A-D,\-\s]+\)$/i;
+
+    function buildRowFromRegexMatch(match, sourceText) {
+        const groups = match.groups || {};
+        const parsedExpression = (groups.expression || '').match(/^(HR|ELB|FX|[1-5])\(([A-D,\-\s]+)\)$/i);
+        const slot = parsedExpression ? parsedExpression[1].toUpperCase() : '';
+        const daySpec = parsedExpression ? parsedExpression[2] : '';
+        // Truncate details at any non-standard expression-like token (e.g. "SB(A,C) S2 ...")
+        // This prevents rows for unknown expression types from bleeding into adjacent rows.
+        const detailTokens = (groups.details || '').trim()
+            .replace(/\s+[A-Z]{2,}\([A-D,\-\s]+\)\s.*$/i, '')
+            .split(/\s+/).filter(Boolean);
+        let enrollment = '';
+        let room = '';
+        let section = '';
+
+        // Strip school name suffix (e.g. "HS-Ruamrudee International School") before right-to-left extraction
+        if (detailTokens.length >= 3) {
+            const lastThree = detailTokens.slice(-3).join(' ');
+            if (/^(?:HS|MS)-\w+\s+International\s+School$/i.test(lastThree)) {
+                detailTokens.splice(-3);
+            }
+        }
+
+        if (detailTokens.length && LIST_ENROLLMENT_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
+            enrollment = detailTokens.pop();
+        }
+        if (detailTokens.length && LIST_ROOM_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
+            room = detailTokens.pop().replace(/^Room:\s*/i, '').toUpperCase();
+        }
+        if (detailTokens.length && LIST_SECTION_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
+            section = detailTokens.pop();
+        }
+
+        const title = normalizeListTitle(detailTokens.join(' '));
+        const isNonTeaching = NON_TEACHING_PATTERNS.some(pattern => pattern.test(title));
+
+        return {
+            expression: groups.expression || '',
+            slot,
+            daySpec,
+            term: groups.term || '',
+            courseCode: groups.courseCode || '',
+            title,
+            section,
+            room,
+            enrollment,
+            category: classifyBlock(slot, title, isNonTeaching),
+            sourceText
+        };
+    }
+
     function parseListScheduleRows(normalizedText) {
         const expressionMatches = Array.from(normalizedText.matchAll(LIST_EXPRESSION_REGEX));
+        const rows = [];
+        const pendingExpressions = [];
 
-        return expressionMatches.map((rowExpressionMatch, index) => {
+        expressionMatches.forEach((rowExpressionMatch, index) => {
             const rowStart = rowExpressionMatch.index;
             const rowEnd = index < expressionMatches.length - 1
                 ? expressionMatches[index + 1].index
                 : normalizedText.length;
             const sourceText = normalizedText.slice(rowStart, rowEnd)
                 .replace(/\bMake all students listed above.*$/i, '')
+                .replace(/\bIcons\b.*$/i, '')
+                .replace(/\bCurrent School\b.*$/i, '')
+                .replace(/\bSchool Name\b.*$/i, '')
                 .replace(/\s+/g, ' ')
                 .trim();
+
             const match = sourceText.match(LIST_ROW_PREFIX_REGEX);
-            if (!match) return null;
-
-            const groups = match.groups || {};
-            const parsedExpression = (groups.expression || '').match(/^(HR|ELB|FX|[1-5])\(([A-D,\-\s]+)\)$/i);
-            const slot = parsedExpression ? parsedExpression[1].toUpperCase() : '';
-            const daySpec = parsedExpression ? parsedExpression[2] : '';
-            const detailTokens = (groups.details || '').trim().split(/\s+/).filter(Boolean);
-            let enrollment = '';
-            let room = '';
-            let section = '';
-
-            if (detailTokens.length && LIST_ENROLLMENT_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
-                enrollment = detailTokens.pop();
-            }
-            if (detailTokens.length && LIST_ROOM_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
-                room = detailTokens.pop().replace(/^Room:\s*/i, '').toUpperCase();
-            }
-            if (detailTokens.length && LIST_SECTION_TOKEN_REGEX.test(detailTokens[detailTokens.length - 1])) {
-                section = detailTokens.pop();
+            if (!match) {
+                // If the slice is just a bare expression, hold it as a pending expression
+                // to be attached to the next successfully-parsed row (multi-expression rows).
+                if (BARE_EXPRESSION_REGEX.test(sourceText)) {
+                    pendingExpressions.push(sourceText.trim());
+                }
+                return;
             }
 
-            const title = normalizeListTitle(detailTokens.join(' '));
-            const isNonTeaching = NON_TEACHING_PATTERNS.some(pattern => pattern.test(title));
+            const row = buildRowFromRegexMatch(match, sourceText);
+            if (!row) return;
 
-            return {
-                expression: groups.expression || '',
-                slot,
-                daySpec,
-                term: groups.term || '',
-                courseCode: groups.courseCode || '',
-                title,
-                section,
-                room,
-                enrollment,
-                category: classifyBlock(slot, title, isNonTeaching),
-                sourceText
-            };
-        }).filter(row => row && row.expression && row.slot && row.daySpec && row.title);
+            rows.push(row);
+
+            // Emit extra rows for any expressions that preceded this row in the source
+            // (e.g. "2(A)" immediately before "5(C) S2 ELRB6S Robotics 6 1 M106 14")
+            pendingExpressions.forEach(exprText => {
+                const exprMatch = exprText.match(/^(HR|ELB|FX|[1-5])\(([A-D,\-\s]+)\)$/i);
+                if (exprMatch) {
+                    rows.push({
+                        ...row,
+                        expression: exprText,
+                        slot: exprMatch[1].toUpperCase(),
+                        daySpec: exprMatch[2],
+                        sourceText: exprText
+                    });
+                }
+            });
+            pendingExpressions.length = 0;
+        });
+
+        return rows.filter(row => row && row.expression && row.slot && row.daySpec && row.title);
     }
 
     function buildParseResult(format, parsedRows) {
