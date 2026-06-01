@@ -64,7 +64,9 @@ function checkMetadata(parsed, expectedMetadata, expectedIgnoredMetadata) {
         if (!block || block.title !== expected.title) {
             missingExpectedTitles.push(`${code}:${expected.title}`);
         }
-        if (!block || block.room !== expected.room) {
+        const actualRoom = block?.room || '';
+        const expectedRoom = expected.room || '';
+        if (!block || actualRoom !== expectedRoom) {
             missingExpectedRooms.push(`${code}:${expected.room || '(blank)'}`);
         }
         if (!block || block.category !== expected.category) {
@@ -77,7 +79,9 @@ function checkMetadata(parsed, expectedMetadata, expectedIgnoredMetadata) {
         if (!block || block.title !== expected.title) {
             missingExpectedTitles.push(`${code}:${expected.title}`);
         }
-        if (!block || block.room !== expected.room) {
+        const actualRoom = block?.room || '';
+        const expectedRoom = expected.room || '';
+        if (!block || actualRoom !== expectedRoom) {
             missingExpectedRooms.push(`${code}:${expected.room || '(blank)'}`);
         }
         if (!block || block.category !== expected.category) {

@@ -66,19 +66,28 @@
     advisory:  { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
     elb:       { bg: '#ccfbf1', text: '#0f766e', border: '#5eead4' },
     planning:  { bg: '#f5f5f4', text: '#57534e', border: '#d6d3d1' },
+    meeting:   { bg: '#ede9fe', text: '#5b21b6', border: '#c4b5fd' },
+    coverage:  { bg: '#e2e8f0', text: '#334155', border: '#94a3b8' },
+    'after-school': { bg: '#fce7f3', text: '#9d174d', border: '#f9a8d4' },
     other:     { bg: '#f7f6f5', text: '#57534e', border: '#d6d3d1' },
   };
 
   const CAT_LABELS = {
     teaching:'Teaching', homeroom:'Homeroom', advisory:'Advisory',
-    elb:'ELB', planning:'Planning', other:'Other',
+    elb:'ELB', planning:'Planning', meeting:'Meeting', coverage:'Coverage',
+    'after-school':'After School', other:'Other',
   };
 
   const SPECIAL_CYCLES = ['HOLIDAY', 'IN-SERVICE', 'PTC', 'SONGKRAN', 'NO-SCHOOL'];
-  const DAY_LETTERS    = ['A','B','C','D'];
-  const NUMERIC_SLOTS  = ['1','2','3','4','5'];
-  // Chronological position labels matching DAY_BLOCK_ORDER: 1,2,3,4,FX,ELB,5.
-  const PERIOD_LABELS  = ['1st','2nd','3rd','4th','Flex','ELB','5th'];
+  const {
+    DAY_LETTERS,
+    DEFAULT_SCHEDULE_BLOCK_MODEL,
+    getCoreSlots,
+    buildBlockCode,
+    getSlotFromCode,
+    getSlotLabel,
+    getScheduleEntriesForCycle,
+  } = window.ScheduleBlockModel;
 
   // ── Low-level jsPDF helpers ────────────────────────────────────────────────
 
@@ -149,32 +158,46 @@
 
   // ── Schedule helpers ──────────────────────────────────────────────────────
 
-  function buildBlockCode(letter, slot) {
-    return ['FX','ELB'].includes(slot) ? `${letter}-${slot}` : `${letter}${slot}`;
-  }
-  function getSlotFromCode(code) {
-    if (!code) return '';
-    return code.includes('-') ? code.split('-')[1] : code.slice(1);
-  }
   function getDayLetter(cycle) {
     if (!cycle) return null;
     const l = cycle.trim().charAt(0).toUpperCase();
     return DAY_LETTERS.includes(l) ? l : null;
   }
-  function getPeriodsForDay(cycle) {
+  function getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses) {
+    const blocks = (teacherBlocks || []).filter(block => {
+      const constraints = block.cycleDayConstraints || [];
+      return block.blockCode === code &&
+        block.selected !== false &&
+        (!cycle || constraints.length === 0 || constraints.includes(cycle));
+    });
+    if (blocks.length) return blocks;
+
+    const value = assignments[code];
+    const titles = Array.isArray(value) ? value : (value ? [value] : []);
+    return titles.map(title => ({
+      blockCode: code,
+      title,
+      room: rooms[code] || null,
+      category: catMap[code] || 'teaching',
+      selected: selClasses.has(code),
+      cycleDayConstraints: []
+    })).filter(block => block.selected);
+  }
+  function getScheduleEntriesForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses) {
     const letter = getDayLetter(cycle);
     if (!letter) return [];
-    const startSlot  = cycle.slice(letter.length);
-    const startIndex = NUMERIC_SLOTS.indexOf(startSlot);
-    const nums = startIndex > 0
-      ? [...NUMERIC_SLOTS.slice(startIndex), ...NUMERIC_SLOTS.slice(0, startIndex)]
-      : [...NUMERIC_SLOTS];
-    return [nums[0],nums[1],nums[2],nums[3],'FX','ELB',nums[4]].map(s => buildBlockCode(letter,s));
+    const asCode = buildBlockCode(letter, 'AS');
+    const hasAfterSchool = getAssignmentsForBlock(asCode, cycle, teacherBlocks, assignments, rooms, catMap, selClasses).length > 0;
+    return getScheduleEntriesForCycle(cycle, modelId || DEFAULT_SCHEDULE_BLOCK_MODEL, hasAfterSchool, 'expanded');
   }
-  function blockColors(code, selClasses, catMap, dutyMode) {
-    if (!selClasses.has(code)) return { bg: CLR.freeBg, text: CLR.freeText, border: CLR.freeBorder };
+  function getPeriodsForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses) {
+    return getScheduleEntriesForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses).map(entry => entry.blockCode);
+  }
+  function blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms) {
+    const blocks = getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses);
+    if (!selClasses.has(code) && blocks.length === 0) return { bg: CLR.freeBg, text: CLR.freeText, border: CLR.freeBorder };
     if (dutyMode === 'category') {
-      const cat = catMap[code] || 'teaching';
+      const cat = blocks[0]?.category || catMap[code] || 'teaching';
       return CAT_COLORS[cat] || CAT_COLORS.teaching;
     }
     return { bg: CLR.dutyBg, text: CLR.dutyText, border: CLR.dutyBorder };
@@ -224,7 +247,7 @@
 
   // ── Monthly overview page ─────────────────────────────────────────────────
 
-  function drawMonthlyPage(doc, monthKey, days, selClasses, assignments, catMap, dutyMode, overlay) {
+  function drawMonthlyPage(doc, monthKey, days, selClasses, assignments, catMap, dutyMode, overlay, teacherBlocks, modelId, rooms) {
     const [year, month] = monthKey.split('-').map(Number);
     const monthName = new Date(year, month-1).toLocaleDateString('en-US',{month:'long', year:'numeric'});
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -357,7 +380,7 @@
 
         // Block chips (near bottom of cell)
         if (!isSpecial) {
-          const periods  = getPeriodsForDay(cycle);
+          const periods  = getPeriodsForDay(cycle, modelId, teacherBlocks, assignments, rooms || {}, catMap, selClasses);
           const chipsBot = rowY + rowH - 1.5;
           const chipH    = 3.2;
           const chipsTop = chipsBot - chipH;
@@ -365,7 +388,7 @@
             const totalGap = 0.4 * (periods.length - 1);
             const chipW    = (iw - totalGap) / periods.length;
             periods.forEach((code, pi) => {
-              const col  = blockColors(code, selClasses, catMap, dutyMode);
+              const col  = blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms || {});
               const chX  = cx + pad + pi * (chipW + 0.4);
               fillRoundRect(doc, chX, chipsTop, chipW, chipH, 0.4,
                 col.bg, col.border);
@@ -382,7 +405,7 @@
 
   // ── Daily list week page ───────────────────────────────────────────────────
 
-  function drawWeekPage(doc, weekLabel, weekDays, selClasses, assignments, catMap, rooms, dutyMode, overlay) {
+  function drawWeekPage(doc, weekLabel, weekDays, selClasses, assignments, catMap, rooms, dutyMode, overlay, teacherBlocks, modelId) {
     const numDays = weekDays.length;
     const dayH    = Math.min(DL_DAYS_H / numDays, DL_DAY_MAX);
 
@@ -457,9 +480,9 @@
       // Row layout: [period label] [title] [room badge] [block chip]
       if (cycle && !isSpecial) {
         const dayBottom  = dayY + dayH - 1.5;
-        const periods    = getPeriodsForDay(cycle);
+        const entries    = getScheduleEntriesForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses);
         // Divide remaining vertical space evenly; clamp to a readable range.
-        const blockRowH  = Math.max(4.5, Math.min(8.5, (dayBottom - curY) / periods.length));
+        const blockRowH  = Math.max(4.5, Math.min(8.5, (dayBottom - curY) / entries.length));
         const chipH      = blockRowH * 0.78;
         const chipTop0   = blockRowH * 0.11; // offset from row top to chip top
         const textOff    = blockRowH * 0.68; // offset from row top to text baseline
@@ -467,20 +490,22 @@
         // Fixed column widths
         const periodColW = 12; // mm — "1st"…"5th" text column
 
-        periods.forEach((code, pi) => {
+        entries.forEach((entry) => {
+          const code = entry.blockCode;
           if (curY + blockRowH > dayBottom + 0.5) return;
 
           const rowTop    = curY;
           const textY     = rowTop + textOff;
           const chipTopY  = rowTop + chipTop0;
-          const periodLbl = PERIOD_LABELS[pi] || getSlotFromCode(code);
           const slot      = getSlotFromCode(code);
-          const assigned  = selClasses.has(code);
-          const col       = blockColors(code, selClasses, catMap, dutyMode);
-          const title     = assignments[code] || '';
-          const room      = rooms[code]       || '';
-          // "Flex" / "ELB" for those slots; full cycle code (C5, A1…) for numeric slots.
-          const blockLbl  = slot === 'FX' ? 'Flex' : slot === 'ELB' ? 'ELB' : code;
+          const periodLbl = entry.periodLabel;
+          const blocks    = getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses);
+          const assigned  = selClasses.has(code) || blocks.length > 0;
+          const col       = blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms);
+          const title     = blocks.map(block => block.title).filter(Boolean).join(' / ');
+          const roomSet   = Array.from(new Set(blocks.map(block => block.room).filter(Boolean)));
+          const room      = roomSet.length === 1 ? roomSet[0] : '';
+          const blockLbl  = /^[1-5]$/.test(slot) ? code : getSlotLabel(slot, 'expanded');
 
           // Period label — left edge
           drawText(doc, periodLbl, DL_ML, textY,
@@ -526,7 +551,7 @@
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  async function generateMonthlyOverviewPDF(calendarData, selClasses, assignments, catMap, rooms, dutyMode, overlay) {
+  async function generateMonthlyOverviewPDF(calendarData, selClasses, assignments, catMap, rooms, dutyMode, overlay, teacherBlocks, modelId) {
     const { jsPDF } = window.jspdf;
     const months = Object.keys(calendarData).sort();
     if (!months.length) return false;
@@ -534,13 +559,13 @@
     const doc = new jsPDF('landscape', 'mm', 'a4');
     months.forEach((mk, i) => {
       if (i > 0) doc.addPage('a4', 'landscape');
-      drawMonthlyPage(doc, mk, calendarData[mk] || [], selClasses, assignments, catMap, dutyMode, overlay);
+      drawMonthlyPage(doc, mk, calendarData[mk] || [], selClasses, assignments, catMap, dutyMode, overlay, teacherBlocks || [], modelId || DEFAULT_SCHEDULE_BLOCK_MODEL, rooms || {});
     });
     doc.save('my-schedule-monthly-overview.pdf');
     return true;
   }
 
-  async function generateDailyListPDF(calendarData, selClasses, assignments, catMap, rooms, dutyMode, overlay) {
+  async function generateDailyListPDF(calendarData, selClasses, assignments, catMap, rooms, dutyMode, overlay, teacherBlocks, modelId) {
     const { jsPDF } = window.jspdf;
     const weeks = groupCalendarDaysByWeek(calendarData);
     if (!weeks.length) return false;
@@ -548,7 +573,7 @@
     const doc = new jsPDF('portrait', 'mm', 'a4');
     weeks.forEach(({ days }, i) => {
       if (i > 0) doc.addPage('a4', 'portrait');
-      drawWeekPage(doc, formatWeekLabel(days), days, selClasses, assignments, catMap, rooms, dutyMode, overlay);
+      drawWeekPage(doc, formatWeekLabel(days), days, selClasses, assignments, catMap, rooms, dutyMode, overlay, teacherBlocks || [], modelId || DEFAULT_SCHEDULE_BLOCK_MODEL);
     });
     doc.save('my-schedule-daily-list.pdf');
     return true;

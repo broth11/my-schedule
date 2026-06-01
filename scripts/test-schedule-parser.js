@@ -23,6 +23,23 @@ ELB(A-D) 25-26 MISC69 Extended Learning Block 28 H402 8
 5(A,C) 25-26 TECH416 IB Computer Science SL Y2 1 H402 4
 `;
 const goldingParsed = parser.parseTeacherScheduleText(goldingFixtureText);
+const expandedFixtureText = `
+Teacher Schedule - Middle School Example
+Expression Term Course # Course Sec # Room Enrollment
+MS-Ruamrudee International School
+SB(A,C) S2 ELCP7 Computer Science 7 1 M106 16
+AS(A-D) 25-26 PER139 Jazz Band (Year) 1 L301 25 HS-Ruamrudee International School
+FX3(B,D) 25-26 MSHH104 Tigers House Home 4 M409 41
+1(A,C) 25-26 ELBN8N Band 8 1 L301 17
+1(A,C) 25-26 ELBCE8 Grade 8 Music Ensemble 1 L301 8
+4(A) 25-26 GRADE7 Grade 7 Team Meeting 2 0
+4(A) 25-26 MSSCMEET Science PLT 1 0
+2(B,D) 25-26 PE008 Physical Education 8 1 GH 20
+3(D) SB(A,C) 25-26 SCI06 General Science 6 3 M102 19
+ADV(A-D) 25-26 ADV08 Advisory 8 1 M408 20
+FXB(B) 25-26 MISC77 Flex Block Support 1 M410 10
+`;
+const expandedParsed = parser.parseTeacherScheduleText(expandedFixtureText);
 
 if (missingExpectedBlocks.length > 0) {
     console.error(`Missing expected teaching blocks: ${missingExpectedBlocks.join(', ')}`);
@@ -123,6 +140,60 @@ assertGoldingIgnoredCodes(['A1']);
     }
 });
 
+function findExpandedBlocks(code, title) {
+    return (expandedParsed.blocks || []).filter(block => block.blockCode === code && (!title || block.title === title));
+}
+
+function assertExpandedBlock(code, expected) {
+    const block = findExpandedBlocks(code, expected.title)[0];
+    if (!block) {
+        console.error(`Expanded fixture missing ${code} "${expected.title}".`);
+        process.exitCode = 1;
+        return;
+    }
+
+    Object.entries(expected).forEach(([field, expectedValue]) => {
+        if (field === 'title') return;
+        const actualValue = Array.isArray(expectedValue) ? JSON.stringify(block[field] || []) : (block[field] || null);
+        const normalizedExpected = Array.isArray(expectedValue) ? JSON.stringify(expectedValue) : expectedValue;
+        if (actualValue !== normalizedExpected) {
+            console.error(`Expanded ${code} ${field}: expected "${normalizedExpected}", got "${actualValue}".`);
+            process.exitCode = 1;
+        }
+    });
+}
+
+if (expandedParsed.primaryScheduleBlockModel !== 'ms-static-block') {
+    console.error(`Expected MS block model, got ${expandedParsed.primaryScheduleBlockModel}.`);
+    process.exitCode = 1;
+}
+
+assertExpandedBlock('A-SB', { title: 'Computer Science 7', room: 'M106', category: 'teaching' });
+assertExpandedBlock('C-SB', { title: 'Computer Science 7', room: 'M106', category: 'teaching' });
+assertExpandedBlock('A-AS', { title: 'Jazz Band (Year)', room: 'L301', category: 'after-school' });
+assertExpandedBlock('D-AS', { title: 'Jazz Band (Year)', room: 'L301', category: 'after-school' });
+assertExpandedBlock('B-FX', { title: 'Tigers House Home', room: 'M409', category: 'homeroom', cycleDayConstraints: ['B3'] });
+assertExpandedBlock('D-FX', { title: 'Tigers House Home', room: 'M409', category: 'homeroom', cycleDayConstraints: ['D3'] });
+assertExpandedBlock('A4', { title: 'Grade 7 Team Meeting', room: null, category: 'meeting' });
+assertExpandedBlock('A4', { title: 'Science PLT', room: null, category: 'meeting' });
+assertExpandedBlock('B2', { title: 'Physical Education 8', room: 'GH', category: 'teaching' });
+assertExpandedBlock('D3', { title: 'General Science 6', room: 'M102', category: 'teaching' });
+assertExpandedBlock('A-SB', { title: 'General Science 6', room: 'M102', category: 'teaching' });
+assertExpandedBlock('A-ADV', { title: 'Advisory 8', room: 'M408', category: 'advisory' });
+assertExpandedBlock('B-FXB', { title: 'Flex Block Support', room: 'M410', category: 'teaching' });
+
+if (findExpandedBlocks('A1').length !== 2 || findExpandedBlocks('C1').length !== 2) {
+    console.error('Expected duplicate A1/C1 assignments to be preserved.');
+    process.exitCode = 1;
+}
+
+(expandedParsed.blocks || []).forEach(block => {
+    if (/\b(?:M106|M102|M408|M409|M410|L301|GH)\s+\d+\b/.test(block.title)) {
+        console.error(`Expanded ${block.blockCode} title is polluted: "${block.title}".`);
+        process.exitCode = 1;
+    }
+});
+
 if (process.exitCode) {
     console.error('Parsed result:', JSON.stringify(parsed, null, 2));
     console.error('Golding parsed result:', JSON.stringify(goldingParsed, null, 2));
@@ -130,4 +201,5 @@ if (process.exitCode) {
     console.log(`Confirmed ${EXPECTED_TEACHING_BLOCKS.length} teaching blocks.`);
     console.log(`Confirmed D2 is planning/non-teaching with ${parsed.ignoredPlanningBlocks} ignored planning block.`);
     console.log('Confirmed Golding admin-table rows parse clean titles, rooms, sections, categories, and expanded codes.');
+    console.log('Confirmed SB, AS, FX-number constraints, ADV/FXB, duplicate assignments, meetings, and room cleanup.');
 }

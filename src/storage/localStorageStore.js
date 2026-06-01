@@ -23,6 +23,8 @@
         scheduleAssignments: {},
         scheduleCategories: {},
         scheduleRooms: {},
+        teacherBlocks: [],
+        primaryScheduleBlockModel: 'hs-flex-elb',
         dutyColorMode: 'single',
         scheduleViewMode: 'auto',
         theme: 'light',
@@ -72,14 +74,38 @@
 
     function normalizeTeacherScheduleSettings(value) {
         const source = isPlainObject(value) ? value : {};
+        const teacherBlocks = Array.isArray(source.teacherBlocks) ? source.teacherBlocks : [];
+        const selectedClasses = Array.isArray(source.selectedClasses) ? source.selectedClasses : [];
+        const legacyAssignments = isPlainObject(source.scheduleAssignments) ? source.scheduleAssignments : {};
+        const legacyCategories = isPlainObject(source.scheduleCategories) ? source.scheduleCategories : {};
+        const legacyRooms = isPlainObject(source.scheduleRooms) ? source.scheduleRooms : {};
+        const migratedTeacherBlocks = teacherBlocks.length ? teacherBlocks : Object.entries(legacyAssignments).flatMap(([blockCode, value]) => {
+            const titles = Array.isArray(value) ? value : [value];
+            return titles.filter(Boolean).map(title => ({
+                blockCode,
+                displayBlockCode: blockCode,
+                title,
+                room: legacyRooms[blockCode] || null,
+                category: legacyCategories[blockCode] || 'teaching',
+                selected: selectedClasses.includes(blockCode),
+                sourceText: ''
+            }));
+        });
+        const hasStaticBlock = migratedTeacherBlocks.some(block => String(block.blockCode || '').includes('-SB'))
+            || selectedClasses.some(code => String(code).includes('-SB'));
+        const primaryScheduleBlockModel = ['hs-flex-elb', 'ms-static-block'].includes(source.primaryScheduleBlockModel)
+            ? source.primaryScheduleBlockModel
+            : (hasStaticBlock ? 'ms-static-block' : 'hs-flex-elb');
 
         return {
             ...DEFAULT_TEACHER_SCHEDULE_SETTINGS,
             version: STORAGE_VERSION,
-            selectedClasses: Array.isArray(source.selectedClasses) ? source.selectedClasses : [],
-            scheduleAssignments: isPlainObject(source.scheduleAssignments) ? source.scheduleAssignments : {},
-            scheduleCategories: isPlainObject(source.scheduleCategories) ? source.scheduleCategories : {},
-            scheduleRooms: isPlainObject(source.scheduleRooms) ? source.scheduleRooms : {},
+            selectedClasses,
+            scheduleAssignments: legacyAssignments,
+            scheduleCategories: legacyCategories,
+            scheduleRooms: legacyRooms,
+            teacherBlocks: migratedTeacherBlocks,
+            primaryScheduleBlockModel,
             theme: normalizeTheme(source.theme, source.darkMode),
             teachingColor: typeof source.teachingColor === 'string' && source.teachingColor ? source.teachingColor : DEFAULT_TEACHER_SCHEDULE_SETTINGS.teachingColor,
             freeColor: typeof source.freeColor === 'string' && source.freeColor ? source.freeColor : DEFAULT_TEACHER_SCHEDULE_SETTINGS.freeColor,

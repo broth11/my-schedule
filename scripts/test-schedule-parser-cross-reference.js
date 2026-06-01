@@ -16,7 +16,9 @@ const {
 
 const rootDir = path.join(__dirname, '..');
 const gridPdfPath = path.join(rootDir, 'samples', 'schedule-ben.pdf');
-const adminPdfPath = path.join(rootDir, 'Teacher Schedule - Roth, Benjamin 2500.pdf');
+const rootAdminPdfPath = path.join(rootDir, 'Teacher Schedule - Roth, Benjamin 2500.pdf');
+const sampleAdminPdfPath = path.join(rootDir, 'samples', 'Teacher Schedule - Roth, Benjamin 2500.pdf');
+const adminPdfPath = fs.existsSync(rootAdminPdfPath) ? rootAdminPdfPath : sampleAdminPdfPath;
 const tmpDir = path.join(rootDir, 'tmp');
 const gridExtractedPath = path.join(tmpDir, 'schedule-ben.grid.extracted.txt');
 const adminExtractedPath = path.join(tmpDir, 'schedule-ben.admin.extracted.txt');
@@ -71,8 +73,9 @@ async function main() {
         process.exit(1);
     }
     if (!fs.existsSync(adminPdfPath)) {
-        console.error(`Missing fixture: ${adminPdfPath}`);
-        console.error('Place the admin-table teacher schedule PDF at "Teacher Schedule - Roth, Benjamin 2500.pdf" (repo root) to run this test.');
+        console.error(`Missing fixture: ${rootAdminPdfPath}`);
+        console.error(`Missing fixture: ${sampleAdminPdfPath}`);
+        console.error('Place the admin-table teacher schedule PDF at the repo root or samples/.');
         console.error('This file is intentionally excluded from git (*.pdf). Obtain it from the school admin portal.');
         process.exit(1);
     }

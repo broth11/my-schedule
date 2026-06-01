@@ -42,6 +42,8 @@ function runEmptyStateTest() {
 
     assertDeepEqual(settings.selectedClasses, [], 'Empty storage should load no selected classes.');
     assertDeepEqual(settings.scheduleAssignments, {}, 'Empty storage should load no schedule assignments.');
+    assertDeepEqual(settings.teacherBlocks, [], 'Empty storage should load no teacher blocks.');
+    assert(settings.primaryScheduleBlockModel === 'hs-flex-elb', 'Empty storage should default to HS block model.');
     assert(settings.theme === 'light', 'Empty storage should default to light theme.');
     assert(imported.useImportedData === false, 'Empty storage should not enable imported calendar data.');
     assertDeepEqual(imported.importedCalendarData, {}, 'Empty storage should load no imported calendar data.');
@@ -55,6 +57,8 @@ function runSaveLoadTeacherScheduleTest() {
         selectedClasses: ['A2', 'B2'],
         scheduleAssignments: { A2: 'IB Math AI HL Y1' },
         scheduleCategories: { A2: 'teaching' },
+        teacherBlocks: [{ blockCode: 'A2', title: 'IB Math AI HL Y1', room: 'H406', category: 'teaching', selected: true }],
+        primaryScheduleBlockModel: 'ms-static-block',
         theme: 'dark',
         teachingColor: '#123456',
         freeColor: '#abcdef',
@@ -69,6 +73,8 @@ function runSaveLoadTeacherScheduleTest() {
     assertDeepEqual(settings.selectedClasses, ['A2', 'B2'], 'Saved selected classes should load.');
     assert(settings.scheduleAssignments.A2 === 'IB Math AI HL Y1', 'Saved assignment should load.');
     assert(settings.scheduleCategories.A2 === 'teaching', 'Saved category should load.');
+    assert(settings.teacherBlocks[0].blockCode === 'A2', 'Saved teacher blocks should load.');
+    assert(settings.primaryScheduleBlockModel === 'ms-static-block', 'Saved block model should load.');
     assert(settings.theme === 'dark', 'Saved theme should load.');
     assert(settings.teachingColor === '#123456', 'Saved teaching color should load.');
     assert(settings.freeColor === '#abcdef', 'Saved free color should load.');
@@ -95,6 +101,21 @@ function runLegacyMigrationTest() {
     assertDeepEqual(settings.selectedClasses, ['A1'], 'Migrated selected classes should load.');
     assert(settings.theme === 'dark', 'Legacy darkMode should migrate to dark theme.');
     assert(settings.scheduleAssignments.A1 === 'Legacy Class', 'Migrated assignments should load.');
+    assert(settings.teacherBlocks[0].title === 'Legacy Class', 'Legacy assignments should migrate to teacher blocks.');
+}
+
+function runStaticBlockModelMigrationTest() {
+    const storage = createMockStorage({
+        teacherSchedule: JSON.stringify({
+            selectedClasses: ['A-SB'],
+            scheduleAssignments: { 'A-SB': 'Computer Science 7' }
+        })
+    });
+
+    store.migrateStoredStateIfNeeded(storage);
+    const settings = store.loadTeacherScheduleSettings(storage);
+
+    assert(settings.primaryScheduleBlockModel === 'ms-static-block', 'Legacy SB data should migrate to MS block model.');
 }
 
 function runInvalidJsonTest() {
@@ -148,6 +169,7 @@ function main() {
         runEmptyStateTest,
         runSaveLoadTeacherScheduleTest,
         runLegacyMigrationTest,
+        runStaticBlockModelMigrationTest,
         runInvalidJsonTest,
         runImportedCalendarTest,
         runDateRangeTest
