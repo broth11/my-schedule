@@ -13,6 +13,7 @@ if (window.pdfjsLib) {
       }
 
       const BUILT_IN_CALENDAR_URL = 'data/school-years/2025-2026.json';
+      const MANUAL_BUSY_TITLE = 'Busy';
       let defaultCalendarData = {};
       let calendarLoadError = null;
 
@@ -79,6 +80,18 @@ if (window.pdfjsLib) {
 
       function isLongInlineLabel(code) {
           return false;
+      }
+
+      function escapeHtml(value) {
+          return String(value || '')
+              .replace(/&/g, '&amp;')
+              .replace(/"/g, '&quot;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+      }
+
+      function escapeAttribute(value) {
+          return escapeHtml(value);
       }
 
       function sanitizeHexColor(value, fallback) {
@@ -666,6 +679,7 @@ if (window.pdfjsLib) {
               grid.appendChild(row);
           });
           updateCount();
+          renderManualDutyNameEditor();
       }
 
       function hasManualAfterSchoolSlot() {
@@ -684,6 +698,81 @@ if (window.pdfjsLib) {
           if (el) el.innerHTML = `<b>${selectedClasses.size}</b> ${selectedClasses.size === 1 ? 'class' : 'classes'} selected`;
       }
 
+      function toggleManualDutyNameEditor() {
+          const toggle = document.getElementById('manualDutyNameToggle');
+          const editor = document.getElementById('manualDutyNameEditor');
+          if (!toggle || !editor) return;
+
+          const willOpen = editor.hidden;
+          editor.hidden = !willOpen;
+          toggle.setAttribute('aria-expanded', String(willOpen));
+
+          if (willOpen) renderManualDutyNameEditor();
+      }
+
+      function getSortedSelectedBlockCodes() {
+          const dayOrder = new Map(DAY_LETTERS.map((letter, index) => [letter, index]));
+          const slotOrder = new Map(['HR', '1', '2', '3', '4', 'FX', 'ELB', '5', 'AS'].map((slot, index) => [slot, index]));
+
+          return Array.from(selectedClasses)
+              .map(normalizeBlockCode)
+              .filter(Boolean)
+              .sort((a, b) => {
+                  const dayDiff = (dayOrder.get(getDayLetterFromCode(a)) ?? 99) - (dayOrder.get(getDayLetterFromCode(b)) ?? 99);
+                  if (dayDiff) return dayDiff;
+
+                  const slotDiff = (slotOrder.get(getSlotFromCode(a)) ?? 99) - (slotOrder.get(getSlotFromCode(b)) ?? 99);
+                  if (slotDiff) return slotDiff;
+
+                  return a.localeCompare(b);
+              });
+      }
+
+      function getManualDutyName(code) {
+          const normalizedCode = normalizeBlockCode(code);
+          const value = scheduleAssignments[normalizedCode];
+          if (Array.isArray(value)) return value.join(' / ');
+          return typeof value === 'string' ? value : '';
+      }
+
+      function setManualDutyName(code, value) {
+          const normalizedCode = normalizeBlockCode(code);
+          const cleanValue = String(value || '').trim();
+
+          if (cleanValue) {
+              scheduleAssignments[normalizedCode] = cleanValue;
+          } else {
+              delete scheduleAssignments[normalizedCode];
+          }
+
+          saveSettings();
+          updateCalendar();
+      }
+
+      function renderManualDutyNameEditor() {
+          const editor = document.getElementById('manualDutyNameEditor');
+          if (!editor || editor.hidden) return;
+
+          const blockCodes = getSortedSelectedBlockCodes();
+          if (!blockCodes.length) {
+              editor.innerHTML = '<div class="manual-duty-name-empty">Select a block above to name it.</div>';
+              return;
+          }
+
+          editor.innerHTML = blockCodes.map(code => `
+              <label class="manual-duty-name-row">
+                  <span class="manual-duty-name-code">${escapeHtml(code)}</span>
+                  <input
+                      type="text"
+                      class="manual-duty-name-input"
+                      value="${escapeAttribute(getManualDutyName(code))}"
+                      placeholder="${MANUAL_BUSY_TITLE}"
+                      oninput="setManualDutyName('${escapeAttribute(code)}', this.value)"
+                  >
+              </label>
+          `).join('');
+      }
+
       // Toggle class selection
       function toggleClass(code) {
           const normalizedCode = normalizeBlockCode(code);
@@ -695,6 +784,7 @@ if (window.pdfjsLib) {
           const btn = document.querySelector(`#classGrid .class-btn[data-code="${CSS.escape(normalizedCode)}"]`);
           if (btn) btn.classList.toggle('sel', selectedClasses.has(normalizedCode));
           updateCount();
+          renderManualDutyNameEditor();
           saveSettings();
           updateCalendar();
       }
@@ -1087,14 +1177,27 @@ if (window.pdfjsLib) {
 
           const value = scheduleAssignments[normalizedCode];
           const titles = Array.isArray(value) ? value : (value ? [value] : []);
-          return titles.map(title => ({
+          if (titles.length) {
+              return titles.map(title => ({
+                  blockCode: normalizedCode,
+                  title,
+                  room: scheduleRooms[normalizedCode] || null,
+                  category: scheduleCategories[normalizedCode] || 'teaching',
+                  selected: true,
+                  source: 'manual',
+                  cycleDayConstraints: []
+              }));
+          }
+
+          return [{
               blockCode: normalizedCode,
-              title,
+              title: MANUAL_BUSY_TITLE,
               room: scheduleRooms[normalizedCode] || null,
               category: scheduleCategories[normalizedCode] || 'teaching',
               selected: true,
+              source: 'manual',
               cycleDayConstraints: []
-          }));
+          }];
       }
 
       function getDisplayTitleForBlock(code, cycleCode = null) {
@@ -1107,8 +1210,8 @@ if (window.pdfjsLib) {
       }
 
       // Authoritative display info for a single block code.
-      // title is the assignment title when one exists; "Assigned" when assigned but
-      // no imported title; "" when not assigned.
+      // title is the assignment title when one exists; "Busy" when manually
+      // selected without a title; "" when not assigned.
       // "Teaching" may appear only in categoryLabel — never as the primary title.
       function getBlockDisplayInfo(code) {
           const normalizedCode = normalizeBlockCode(code);
@@ -1116,7 +1219,7 @@ if (window.pdfjsLib) {
           const assignmentsForBlock = getAssignmentsForBlock(normalizedCode);
           const isAssigned = isBlockActive(normalizedCode);
           const rawTitle   = assignmentsForBlock.length ? assignmentsForBlock.map(block => block.title).filter(Boolean).join(' / ') : '';
-          const title      = isAssigned ? (rawTitle || 'Assigned') : '';
+          const title      = isAssigned ? (rawTitle || MANUAL_BUSY_TITLE) : '';
           const category   = isAssigned ? (assignmentsForBlock[0]?.category || scheduleCategories[normalizedCode] || 'teaching') : null;
           const categoryLabel = category ? ({
               teaching: 'Teaching', homeroom: 'Homeroom', advisory: 'Advisory',

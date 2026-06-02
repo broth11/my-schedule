@@ -78,6 +78,7 @@
     'after-school':'After School', other:'Other',
   };
 
+  const MANUAL_BUSY_TITLE = 'Busy';
   const SPECIAL_CYCLES = ['HOLIDAY', 'IN-SERVICE', 'PTC', 'SONGKRAN', 'NO-SCHOOL'];
   const {
     DAY_LETTERS,
@@ -177,14 +178,27 @@
 
     const value = assignments[normalizedCode];
     const titles = Array.isArray(value) ? value : (value ? [value] : []);
-    return titles.map(title => ({
+    if (titles.length) {
+      return titles.map(title => ({
+        blockCode: normalizedCode,
+        title,
+        room: rooms[normalizedCode] || null,
+        category: catMap[normalizedCode] || 'teaching',
+        selected: true,
+        source: 'manual',
+        cycleDayConstraints: []
+      }));
+    }
+
+    return [{
       blockCode: normalizedCode,
-      title,
+      title: MANUAL_BUSY_TITLE,
       room: rooms[normalizedCode] || null,
       category: catMap[normalizedCode] || 'teaching',
       selected: true,
+      source: 'manual',
       cycleDayConstraints: []
-    }));
+    }];
   }
   function getScheduleEntriesForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses) {
     const letter = getDayLetter(cycle);

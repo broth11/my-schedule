@@ -308,6 +308,71 @@ body {
 .count-line { margin-top: 14px; font-size: 13px; color: var(--ink-2); font-weight: 500; }
 .count-line b { color: var(--accent-strong); font-weight: 700; }
 
+.manual-duty-name-section {
+  margin-top: 14px;
+}
+
+.manual-duty-name-toggle {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.manual-duty-name-toggle:hover {
+  border-color: var(--accent-ring);
+  background: var(--accent-tint);
+}
+
+.manual-duty-name-editor {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.manual-duty-name-empty {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 10px 0 2px;
+}
+
+.manual-duty-name-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.manual-duty-name-code {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.manual-duty-name-input {
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.manual-duty-name-input:focus {
+  outline: 2px solid var(--accent-ring);
+  border-color: var(--accent);
+}
+
 @media (max-width: 720px) {
   .class-grid {
     overflow-x: auto;

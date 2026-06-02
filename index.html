@@ -43,6 +43,22 @@
           <div class="section-help">Tap the classes you teach. They'll light up on your calendar.</div>
           <div class="class-grid" id="classGrid"></div>
           <div class="count-line" id="countLine"></div>
+          <div class="manual-duty-name-section">
+            <button
+              type="button"
+              class="manual-duty-name-toggle"
+              id="manualDutyNameToggle"
+              aria-expanded="false"
+              onclick="toggleManualDutyNameEditor()"
+            >
+              Edit Duty Names
+            </button>
+            <div
+              class="manual-duty-name-editor"
+              id="manualDutyNameEditor"
+              hidden
+            ></div>
+          </div>
         </div>
 
         <div class="section">

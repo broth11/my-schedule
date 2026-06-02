@@ -28,6 +28,7 @@ const scheduleRooms = {
   'D-FX':  'H406',
   'D-ELB': 'H406',
 };
+const MANUAL_BUSY_TITLE = 'Busy';
 
 // ── Inline implementation matching src/main.js getBlockDisplayInfo ───────────
 
@@ -35,7 +36,7 @@ function getBlockDisplayInfo(code) {
   const slotLabel  = code.includes('-') ? code.split('-')[1] : code.slice(1);
   const isAssigned = selectedClasses.has(code);
   const rawTitle   = scheduleAssignments[code] || '';
-  const title      = isAssigned ? (rawTitle || 'Assigned') : '';
+  const title      = isAssigned ? (rawTitle || MANUAL_BUSY_TITLE) : '';
   const category   = isAssigned ? (scheduleCategories[code] || 'teaching') : null;
   const categoryLabel = category ? ({
     teaching: 'Teaching', homeroom: 'Homeroom', advisory: 'Advisory',
@@ -92,14 +93,14 @@ check('title = ""',      unassigned.title,      '');
 check('isAssigned = false', unassigned.isAssigned, false);
 check('categoryLabel = ""', unassigned.categoryLabel, '');
 
-// Assigned block with no imported title must return "Assigned", not "Teaching"
+// Assigned block with no imported title must return "Busy", not "Teaching"
 const noTitle = new Set(['D3']);
 const origSelected = selectedClasses.has('D3');
 selectedClasses.add('D3');
 delete scheduleAssignments['D3'];
 const withoutTitle = getBlockDisplayInfo('D3');
 console.log('\n  D3 (assigned, no imported title):');
-check('title = "Assigned"',            withoutTitle.title, 'Assigned');
+check('title = "Busy"',                withoutTitle.title, 'Busy');
 check('title is not "Teaching"',       withoutTitle.title !== 'Teaching', true);
 if (!origSelected) selectedClasses.delete('D3');
 
