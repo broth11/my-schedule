@@ -82,6 +82,17 @@ if (window.pdfjsLib) {
           return getSlotLabel(getSlotFromCode(code), 'compact');
       }
 
+      function formatCompactPeriodLabel(codeOrSlot) {
+          const normalized = String(codeOrSlot || '').toUpperCase();
+          const slot = normalized.includes('-') || /^[A-D][1-5]$/.test(normalized)
+              ? getSlotFromCode(normalized)
+              : normalized;
+          if (slot === 'FXSB') {
+              return '<span class="compact-fxsb-label"><span>FX</span><span>SB</span></span>';
+          }
+          return getSlotLabel(slot, 'compact');
+      }
+
       function isLongInlineLabel(code) {
           return false;
       }
@@ -1294,7 +1305,7 @@ if (window.pdfjsLib) {
 
           return periods.map(p => {
               const isAssigned = isBlockActive(p);
-              const label      = formatInlinePeriodLabel(p);
+              const label      = formatCompactPeriodLabel(p);
               const tooltip    = getBlockTooltip(p);
 
               if (!isAssigned) {
@@ -1338,13 +1349,13 @@ if (window.pdfjsLib) {
           if (isSpecial) {
               const slots = getCoreSlots(primaryScheduleBlockModel);
               periodCount = slots.length;
-              pills = slots.map(slot => `<div class="pill">${getSlotLabel(slot, 'compact')}</div>`).join('');
+              pills = slots.map(slot => `<div class="pill">${formatCompactPeriodLabel(slot)}</div>`).join('');
           } else {
               const periods = getPeriodsForDay(cycleCode);
               periodCount = periods.length;
               teachCount = periods.filter(p => isBlockActive(p)).length;
               pills = periods.map(p => {
-                  const label = getSlotLabel(getSlotFromCode(p), 'compact');
+                  const label = formatCompactPeriodLabel(p);
                   return `<div class="${getPillClass(p, cycleCode)}" title="${getBlockTooltip(p)}">${label}</div>`;
               }).join('');
           }
