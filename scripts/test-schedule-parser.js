@@ -184,17 +184,34 @@ if (mixedSchoolWithSb.primaryScheduleBlockModel !== 'ms-static-block') {
     process.exitCode = 1;
 }
 
-assertExpandedBlock('A-SB', { title: 'Computer Science 7', room: 'M106', category: 'teaching' });
-assertExpandedBlock('C-SB', { title: 'Computer Science 7', room: 'M106', category: 'teaching' });
+const msFxAndSb = parser.parseTeacherScheduleText(`
+Teacher Schedule - MS FX SB Example
+Expression Term Course # Course Sec # Room Enrollment
+MS-Ruamrudee International School
+FX(A) S2 HELP7 Math Help 1 M101 10 MS-Ruamrudee International School
+SB(A) S2 HELP7 Math Help 1 M101 10 MS-Ruamrudee International School
+`);
+const msFxSbBlocks = (msFxAndSb.blocks || []).filter(block => block.blockCode === 'A-FXSB');
+if (msFxAndSb.primaryScheduleBlockModel !== 'ms-static-block') {
+    console.error(`Expected FX/SB sample to use MS block model, got ${msFxAndSb.primaryScheduleBlockModel}.`);
+    process.exitCode = 1;
+}
+if (msFxSbBlocks.length !== 1) {
+    console.error(`Expected FX(A) and SB(A) to dedupe to one A-FXSB block, got ${msFxSbBlocks.length}.`);
+    process.exitCode = 1;
+}
+
+assertExpandedBlock('A-FXSB', { title: 'Computer Science 7', room: 'M106', category: 'teaching' });
+assertExpandedBlock('C-FXSB', { title: 'Computer Science 7', room: 'M106', category: 'teaching' });
 assertExpandedBlock('A-AS', { title: 'Jazz Band (Year)', room: 'L301', category: 'after-school' });
 assertExpandedBlock('D-AS', { title: 'Jazz Band (Year)', room: 'L301', category: 'after-school' });
-assertExpandedBlock('B-FX', { title: 'Tigers House Home', room: 'M409', category: 'homeroom', cycleDayConstraints: ['B3'] });
-assertExpandedBlock('D-FX', { title: 'Tigers House Home', room: 'M409', category: 'homeroom', cycleDayConstraints: ['D3'] });
+assertExpandedBlock('B-FXSB', { title: 'Tigers House Home', room: 'M409', category: 'homeroom', cycleDayConstraints: ['B3'] });
+assertExpandedBlock('D-FXSB', { title: 'Tigers House Home', room: 'M409', category: 'homeroom', cycleDayConstraints: ['D3'] });
 assertExpandedBlock('A4', { title: 'Grade 7 Team Meeting', room: null, category: 'meeting' });
 assertExpandedBlock('A4', { title: 'Science PLT', room: null, category: 'meeting' });
 assertExpandedBlock('B2', { title: 'Physical Education 8', room: 'GH', category: 'teaching' });
 assertExpandedBlock('D3', { title: 'General Science 6', room: 'M102', category: 'teaching' });
-assertExpandedBlock('A-SB', { title: 'General Science 6', room: 'M102', category: 'teaching' });
+assertExpandedBlock('A-FXSB', { title: 'General Science 6', room: 'M102', category: 'teaching' });
 assertExpandedBlock('A-ADV', { title: 'Advisory 8', room: 'M408', category: 'advisory' });
 assertExpandedBlock('B-FXB', { title: 'Flex Block Support', room: 'M410', category: 'teaching' });
 

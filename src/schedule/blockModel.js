@@ -10,7 +10,7 @@
     }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
     const DAY_LETTERS = ['A', 'B', 'C', 'D'];
-    const HYPHENATED_SLOTS = new Set(['HR', 'FX', 'ELB', 'SB', 'AS', 'ADV', 'FXB']);
+    const HYPHENATED_SLOTS = new Set(['HR', 'FX', 'ELB', 'SB', 'FXSB', 'AS', 'ADV', 'FXB']);
 
     const SCHEDULE_BLOCK_MODELS = {
         'hs-flex-elb': {
@@ -21,7 +21,7 @@
         'ms-static-block': {
             id: 'ms-static-block',
             label: 'Middle School',
-            slots: ['1', '2', '3', '4', 'SB', '5']
+            slots: ['1', '2', '3', '4', 'FXSB', '5']
         }
     };
 
@@ -47,7 +47,7 @@
             .trim()
             .toUpperCase()
             .replace(/\s+/g, '-')
-            .replace(/^([A-D])(?:-)?(HR|FX|ELB|SB|AS|ADV|FXB)$/i, '$1-$2')
+            .replace(/^([A-D])(?:-)?(HR|FX|ELB|SB|FXSB|AS|ADV|FXB)$/i, '$1-$2')
             .replace(/^([A-D])(?:-)?([1-5])$/i, '$1$2');
     }
 
@@ -68,6 +68,7 @@
         if (normalizedSlot === 'FX') return context === 'expanded' ? 'Flex' : 'FX';
         if (normalizedSlot === 'ELB') return 'ELB';
         if (normalizedSlot === 'SB') return context === 'expanded' ? 'Static Block' : 'SB';
+        if (normalizedSlot === 'FXSB') return context === 'expanded' ? 'Flex / Static Block' : 'FX/SB';
         if (normalizedSlot === 'AS') return context === 'expanded' ? 'After School' : 'AS';
         if (normalizedSlot === 'HR') return context === 'expanded' ? 'Homeroom' : 'HR';
         if (normalizedSlot === 'ADV') return context === 'expanded' ? 'Advisory' : 'ADV';
@@ -84,12 +85,24 @@
 
     function detectPrimaryScheduleBlockModel(text, parsedRows = []) {
         const source = text || '';
-        if ((parsedRows || []).some(row => row.slot === 'SB')) return 'ms-static-block';
+        const slots = new Set((parsedRows || []).map(row => row.rawSlot || row.slot));
+        if (slots.has('SB') && !slots.has('ELB')) return 'ms-static-block';
+        if (slots.has('ELB') && !slots.has('SB')) return 'hs-flex-elb';
         const schoolMatch = source.match(/\b(?:MS|HS)-Ruamrudee International School\b/i);
         if (schoolMatch) {
             return /^MS-/i.test(schoolMatch[0]) ? 'ms-static-block' : 'hs-flex-elb';
         }
         return DEFAULT_SCHEDULE_BLOCK_MODEL;
+    }
+
+    function normalizeBlockCodeForModel(code, modelId = DEFAULT_SCHEDULE_BLOCK_MODEL) {
+        const normalizedCode = normalizeBlockCode(code);
+        const day = getDayLetterFromCode(normalizedCode);
+        const slot = getSlotFromCode(normalizedCode);
+        if (normalizeModelId(modelId) === 'ms-static-block' && day && ['FX', 'SB', 'FXSB'].includes(slot)) {
+            return buildBlockCode(day, 'FXSB');
+        }
+        return normalizedCode;
     }
 
     function getRotatedNumericSlots(cycleCode) {
@@ -178,6 +191,7 @@
         getSlotLabel,
         getPeriodLabel,
         detectPrimaryScheduleBlockModel,
+        normalizeBlockCodeForModel,
         getRotatedNumericSlots,
         getSlotsForCycle,
         getScheduleEntriesForCycle,

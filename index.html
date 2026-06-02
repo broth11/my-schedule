@@ -71,6 +71,15 @@
         </div>
 
         <div class="section">
+          <div class="section-label">Schedule type</div>
+          <div class="section-help">HS uses separate Flex and ELB periods. MS uses one combined Flex/Static Block period.</div>
+          <div class="seg-control" id="scheduleTypeControl" role="group" aria-label="Schedule type">
+            <button class="seg-btn" data-model="hs-flex-elb" onclick="setScheduleBlockModel('hs-flex-elb')">HS: FX / ELB</button>
+            <button class="seg-btn" data-model="ms-static-block" onclick="setScheduleBlockModel('ms-static-block')">MS: FX / SB</button>
+          </div>
+        </div>
+
+        <div class="section">
           <div class="section-label">Duty colors</div>
           <div class="seg-control" id="dutyColorControl" role="group" aria-label="Duty color mode">
             <button class="seg-btn" data-mode="single"   onclick="setDutyColorMode('single')">Single duty color</button>

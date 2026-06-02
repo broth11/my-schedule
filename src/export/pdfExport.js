@@ -86,6 +86,7 @@
     getCoreSlots,
     buildBlockCode,
     normalizeBlockCode,
+    normalizeBlockCodeForModel,
     getSlotFromCode,
     getSlotLabel,
     getScheduleEntriesForCycle,
@@ -165,25 +166,50 @@
     const l = cycle.trim().charAt(0).toUpperCase();
     return DAY_LETTERS.includes(l) ? l : null;
   }
-  function getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses) {
-    const normalizedCode = normalizeBlockCode(code);
-    if (!selClasses.has(normalizedCode)) return [];
+  function hasSelectedBlock(selClasses, code, modelId) {
+    const normalizedCode = normalizeBlockCodeForModel(code, modelId || DEFAULT_SCHEDULE_BLOCK_MODEL);
+    if (selClasses.has(normalizedCode)) return true;
+    const day = normalizedCode.charAt(0);
+    const slot = getSlotFromCode(normalizedCode);
+    if ((modelId || DEFAULT_SCHEDULE_BLOCK_MODEL) === 'ms-static-block' && slot === 'FXSB') {
+      return ['FX', 'SB'].some(aliasSlot => selClasses.has(buildBlockCode(day, aliasSlot)));
+    }
+    return false;
+  }
+
+  function valueForBlock(map, code, modelId) {
+    const normalizedCode = normalizeBlockCodeForModel(code, modelId || DEFAULT_SCHEDULE_BLOCK_MODEL);
+    if (Object.prototype.hasOwnProperty.call(map || {}, normalizedCode)) return map[normalizedCode];
+    const day = normalizedCode.charAt(0);
+    const slot = getSlotFromCode(normalizedCode);
+    if ((modelId || DEFAULT_SCHEDULE_BLOCK_MODEL) === 'ms-static-block' && slot === 'FXSB') {
+      for (const aliasSlot of ['FX', 'SB']) {
+        const aliasCode = buildBlockCode(day, aliasSlot);
+        if (Object.prototype.hasOwnProperty.call(map || {}, aliasCode)) return map[aliasCode];
+      }
+    }
+    return undefined;
+  }
+
+  function getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses, modelId) {
+    const normalizedCode = normalizeBlockCodeForModel(code, modelId || DEFAULT_SCHEDULE_BLOCK_MODEL);
+    if (!hasSelectedBlock(selClasses, normalizedCode, modelId)) return [];
 
     const blocks = (teacherBlocks || []).filter(block => {
       const constraints = block.cycleDayConstraints || [];
-      return normalizeBlockCode(block.blockCode) === normalizedCode &&
+      return normalizeBlockCodeForModel(block.blockCode, modelId || DEFAULT_SCHEDULE_BLOCK_MODEL) === normalizedCode &&
         (!cycle || constraints.length === 0 || constraints.includes(cycle));
     });
     if (blocks.length) return blocks;
 
-    const value = assignments[normalizedCode];
+    const value = valueForBlock(assignments, normalizedCode, modelId);
     const titles = Array.isArray(value) ? value : (value ? [value] : []);
     if (titles.length) {
       return titles.map(title => ({
         blockCode: normalizedCode,
         title,
-        room: rooms[normalizedCode] || null,
-        category: catMap[normalizedCode] || 'teaching',
+        room: valueForBlock(rooms, normalizedCode, modelId) || null,
+        category: valueForBlock(catMap, normalizedCode, modelId) || 'teaching',
         selected: true,
         source: 'manual',
         cycleDayConstraints: []
@@ -193,8 +219,8 @@
     return [{
       blockCode: normalizedCode,
       title: MANUAL_BUSY_TITLE,
-      room: rooms[normalizedCode] || null,
-      category: catMap[normalizedCode] || 'teaching',
+      room: valueForBlock(rooms, normalizedCode, modelId) || null,
+      category: valueForBlock(catMap, normalizedCode, modelId) || 'teaching',
       selected: true,
       source: 'manual',
       cycleDayConstraints: []
@@ -204,18 +230,30 @@
     const letter = getDayLetter(cycle);
     if (!letter) return [];
     const asCode = buildBlockCode(letter, 'AS');
-    const hasAfterSchool = getAssignmentsForBlock(asCode, cycle, teacherBlocks, assignments, rooms, catMap, selClasses).length > 0;
+    const hasAfterSchool = getAssignmentsForBlock(asCode, cycle, teacherBlocks, assignments, rooms, catMap, selClasses, modelId).length > 0;
     return getScheduleEntriesForCycle(cycle, modelId || DEFAULT_SCHEDULE_BLOCK_MODEL, hasAfterSchool, 'expanded');
   }
   function getPeriodsForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses) {
     return getScheduleEntriesForDay(cycle, modelId, teacherBlocks, assignments, rooms, catMap, selClasses).map(entry => entry.blockCode);
   }
-  function blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms) {
+
+  function getPdfPeriodLabel(entry) {
+    const slot = entry?.slot || getSlotFromCode(entry?.blockCode);
+    if (slot === 'FXSB') return 'FX/SB';
+    return entry?.periodLabel || getSlotLabel(slot, 'expanded');
+  }
+
+  function getPdfBlockBadgeLabel(code) {
     const normalizedCode = normalizeBlockCode(code);
-    const blocks = getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses);
-    if (!selClasses.has(normalizedCode)) return { bg: CLR.freeBg, text: CLR.freeText, border: CLR.freeBorder };
+    return getSlotFromCode(normalizedCode) === 'FXSB' ? normalizedCode : normalizedCode;
+  }
+
+  function blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms, modelId) {
+    const normalizedCode = normalizeBlockCodeForModel(code, modelId || DEFAULT_SCHEDULE_BLOCK_MODEL);
+    const blocks = getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses, modelId);
+    if (!hasSelectedBlock(selClasses, normalizedCode, modelId)) return { bg: CLR.freeBg, text: CLR.freeText, border: CLR.freeBorder };
     if (dutyMode === 'category') {
-      const cat = blocks[0]?.category || catMap[normalizedCode] || 'teaching';
+      const cat = blocks[0]?.category || valueForBlock(catMap, normalizedCode, modelId) || 'teaching';
       return CAT_COLORS[cat] || CAT_COLORS.teaching;
     }
     return { bg: CLR.dutyBg, text: CLR.dutyText, border: CLR.dutyBorder };
@@ -406,11 +444,11 @@
             const totalGap = 0.4 * (periods.length - 1);
             const chipW    = (iw - totalGap) / periods.length;
             periods.forEach((code, pi) => {
-              const col  = blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms || {});
+              const col  = blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms || {}, modelId);
               const chX  = cx + pad + pi * (chipW + 0.4);
               fillRoundRect(doc, chX, chipsTop, chipW, chipH, 0.4,
                 col.bg, col.border);
-              const slot  = getSlotFromCode(code);
+              const slot  = getSlotLabel(getSlotFromCode(code), 'compact');
               const slotW = getTextW(doc, slot, 5.5, true);
               drawText(doc, slot, chX + (chipW - slotW) / 2, chipsTop + chipH - 0.7,
                 { size:5.5, bold:true, color:col.text });
@@ -506,7 +544,8 @@
         const textOff    = blockRowH * 0.68; // offset from row top to text baseline
 
         // Fixed column widths
-        const periodColW = 12; // mm — "1st"…"5th" text column
+        const periodColW = 13; // mm — "1st"…"5th"/"FX/SB" text column
+        const blockW = 18; // fixed width sized for D-FXSB
 
         entries.forEach((entry) => {
           const code = entry.blockCode;
@@ -516,14 +555,14 @@
           const textY     = rowTop + textOff;
           const chipTopY  = rowTop + chipTop0;
           const slot      = getSlotFromCode(code);
-          const periodLbl = entry.periodLabel;
-          const blocks    = getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses);
-          const assigned  = selClasses.has(normalizeBlockCode(code));
-          const col       = blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms);
+          const periodLbl = getPdfPeriodLabel(entry);
+          const blocks    = getAssignmentsForBlock(code, cycle, teacherBlocks, assignments, rooms, catMap, selClasses, modelId);
+          const assigned  = hasSelectedBlock(selClasses, code, modelId);
+          const col       = blockColors(code, cycle, selClasses, catMap, dutyMode, teacherBlocks, assignments, rooms, modelId);
           const title     = blocks.map(block => block.title).filter(Boolean).join(' / ');
           const roomSet   = Array.from(new Set(blocks.map(block => block.room).filter(Boolean)));
           const room      = roomSet.length === 1 ? roomSet[0] : '';
-          const blockLbl  = /^[1-5]$/.test(slot) ? code : getSlotLabel(slot, 'expanded');
+          const blockLbl  = getPdfBlockBadgeLabel(code);
 
           // Period label — left edge
           drawText(doc, periodLbl, DL_ML, textY,
@@ -533,7 +572,6 @@
 
           // Block chip — far right
           const bLblW  = getTextW(doc, blockLbl, 7, true);
-          const blockW = Math.max(bLblW + 5, 11);
           const blockX = DL_W - DL_MR - blockW;
           fillRoundRect(doc, blockX, chipTopY, blockW, chipH, 0.5, col.bg, col.border);
           drawText(doc, blockLbl, blockX + (blockW - bLblW) / 2, textY,

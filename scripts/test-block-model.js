@@ -17,25 +17,29 @@ function main() {
 
     const msA5 = model.getScheduleEntriesForCycle('A5', 'ms-static-block', false, 'expanded');
     assert(
-        summarize(msA5) === '1st:A5|2nd:A1|3rd:A2|4th:A3|Static Block:A-SB|5th:A4',
+        summarize(msA5) === '1st:A5|2nd:A1|3rd:A2|4th:A3|Flex / Static Block:A-FXSB|5th:A4',
         `MS A5 order/labels mismatch: ${summarize(msA5)}`
     );
 
     const msA5WithAs = model.getScheduleEntriesForCycle('A5', 'ms-static-block', true, 'expanded');
     assert(
-        summarize(msA5WithAs) === '1st:A5|2nd:A1|3rd:A2|4th:A3|Static Block:A-SB|5th:A4|After School:A-AS',
+        summarize(msA5WithAs) === '1st:A5|2nd:A1|3rd:A2|4th:A3|Flex / Static Block:A-FXSB|5th:A4|After School:A-AS',
         `MS A5 AS order/labels mismatch: ${summarize(msA5WithAs)}`
     );
 
     const compact = model.getScheduleEntriesForCycle('A5', 'ms-static-block', true, 'compact');
     assert(
-        summarize(compact) === '1st:A5|2nd:A1|3rd:A2|4th:A3|SB:A-SB|5th:A4|AS:A-AS',
+        summarize(compact) === '1st:A5|2nd:A1|3rd:A2|4th:A3|FX/SB:A-FXSB|5th:A4|AS:A-AS',
         `Compact labels mismatch: ${summarize(compact)}`
     );
 
     assert(model.normalizeBlockCode('A ELB') === 'A-ELB', 'A ELB should normalize to A-ELB.');
     assert(model.normalizeBlockCode('aelb') === 'A-ELB', 'aelb should normalize to A-ELB.');
     assert(model.normalizeBlockCode('A-ELB') === 'A-ELB', 'A-ELB should remain canonical.');
+    assert(model.normalizeBlockCode('A FXSB') === 'A-FXSB', 'A FXSB should normalize to A-FXSB.');
+    assert(model.normalizeBlockCodeForModel('A-SB', 'ms-static-block') === 'A-FXSB', 'MS A-SB should alias to A-FXSB.');
+    assert(model.normalizeBlockCodeForModel('A-FX', 'ms-static-block') === 'A-FXSB', 'MS A-FX should alias to A-FXSB.');
+    assert(model.normalizeBlockCodeForModel('A-FX', 'hs-flex-elb') === 'A-FX', 'HS A-FX should remain A-FX.');
     assert(model.normalizeBlockCode('a 5') === 'A5', 'a 5 should normalize to A5.');
 
     console.log('Block model structure tests passed');

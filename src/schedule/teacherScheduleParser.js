@@ -14,7 +14,8 @@
     const {
         DAY_LETTERS,
         buildBlockCode,
-        detectPrimaryScheduleBlockModel
+        detectPrimaryScheduleBlockModel,
+        normalizeBlockCodeForModel
     } = blockModel;
     const NON_TEACHING_PATTERNS = [/common planning time/i, /planning time/i];
 
@@ -106,7 +107,7 @@
         }
 
         const cleaned = (text || '')
-            .replace(/^(HR|ELB|FX|[1-5])\([^)]+\)\s*/i, '')
+            .replace(/^(HR|ELB|FX|SB|FXSB|AS|[1-5])\([^)]+\)\s*/i, '')
             .replace(/^(25-26|S1|S2)\s*/i, '')
             .replace(/^\d+\/\d+\s*/i, '')
             .replace(/\b[A-Z]{3,}\d+\s*\.\s*\d+[A-Z]?\b.*$/i, '')
@@ -163,7 +164,7 @@
         };
     }
 
-    const EXPRESSION_TOKEN_PATTERN = '(?:ADV|FXB|FX[1-5]|HR|ELB|FX|SB|AS|[1-5])';
+    const EXPRESSION_TOKEN_PATTERN = '(?:ADV|FXB|FX[1-5]|HR|ELB|FXSB|FX|SB|AS|[1-5])';
     const LIST_EXPRESSION_REGEX = new RegExp(`\\b${EXPRESSION_TOKEN_PATTERN}\\([A-D,\\-\\s]+\\)`, 'gi');
     const LIST_ROW_PREFIX_REGEX = new RegExp(`^(?<expression>${EXPRESSION_TOKEN_PATTERN}\\([A-D,\\-\\s]+\\))\\s+(?<term>(?:\\d{2}-\\d{2}|S[12]))\\s+(?<courseCode>[A-Z][A-Z0-9]*)\\s+(?<details>.+)$`, 'i');
     const LIST_ROOM_TOKEN_REGEX = /^(?:[A-Z]{1,4}\d{0,4}|\d{1,2}-\d+|TBD|Room:\s*\S+)$/i;
@@ -296,7 +297,13 @@
         return rows.filter(row => row && row.expression && row.slot && row.daySpec && row.title);
     }
 
-    function buildParseResult(format, parsedRows) {
+    function getEffectiveSlot(slot, modelId) {
+        const normalizedSlot = String(slot || '').toUpperCase();
+        if (modelId === 'ms-static-block' && ['FX', 'SB', 'FXSB'].includes(normalizedSlot)) return 'FXSB';
+        return normalizedSlot;
+    }
+
+    function buildParseResult(format, parsedRows, modelId) {
         const selectedCodes = new Set();
         const assignments = {};
         const blockMap = new Map();
@@ -306,9 +313,13 @@
 
         parsedRows.forEach(row => {
             const days = expandDaySpec(row.daySpec);
+            const effectiveSlot = getEffectiveSlot(row.slot, modelId);
+            const effectiveCategory = row.category === 'planning'
+                ? 'planning'
+                : classifyBlock(effectiveSlot, row.title, false);
 
             days.forEach(day => {
-                const code = buildBlockCode(day, row.slot);
+                const code = normalizeBlockCodeForModel(buildBlockCode(day, effectiveSlot), modelId);
                 const cycleDayConstraints = row.cycleSlotConstraint
                     ? [`${day}${row.cycleSlotConstraint}`]
                     : [];
@@ -316,10 +327,10 @@
                     blockCode: code,
                     displayBlockCode: code,
                     dayLetter: day,
-                    slot: row.slot,
+                    slot: effectiveSlot,
                     rawSlot: row.rawSlot || row.slot,
                     cycleDayConstraints,
-                    category: row.category,
+                    category: effectiveCategory,
                     title: row.title,
                     room: row.room || null,
                     section: row.section || '',
@@ -336,7 +347,7 @@
                     blockMetadata.cycleDayConstraints.join(',')
                 ].join('|');
 
-                if (row.category !== 'planning') {
+                if (effectiveCategory !== 'planning') {
                     selectedCodes.add(code);
                     if (row.title) {
                         const current = assignments[code];
@@ -396,10 +407,11 @@
             const listRows = parseListScheduleRows(normalized);
             if (listRows.length) {
                 parsedRows = listRows;
+                const primaryScheduleBlockModel = detectPrimaryScheduleBlockModel(normalized, parsedRows);
                 return {
-                    ...buildParseResult(format, parsedRows),
+                    ...buildParseResult(format, parsedRows, primaryScheduleBlockModel),
                     teacherName,
-                    primaryScheduleBlockModel: detectPrimaryScheduleBlockModel(normalized, parsedRows)
+                    primaryScheduleBlockModel
                 };
             }
         }
@@ -439,10 +451,11 @@
             };
         });
 
+        const primaryScheduleBlockModel = detectPrimaryScheduleBlockModel(normalized, parsedRows);
         return {
-            ...buildParseResult(format, parsedRows),
+            ...buildParseResult(format, parsedRows, primaryScheduleBlockModel),
             teacherName,
-            primaryScheduleBlockModel: detectPrimaryScheduleBlockModel(normalized, parsedRows)
+            primaryScheduleBlockModel
         };
     }
 
